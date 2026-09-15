@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_SLOTS } from "./defaults";
 import { matchPastedPlayers, parsePastedNames, searchPlayers } from "./names";
 import { assignNight, evaluateCandidate, pickSlot } from "./overlap";
+import { formatEligibility, toggleFantasyPosition } from "./positions";
 import type { NhlPlayer, SlotConfig } from "./types";
 import { buildWeeks } from "./weeks";
 
@@ -94,6 +95,40 @@ describe("candidate overlap vs existing roster (priority to roster)", () => {
     expect(metrics.forcedBenchNights).toBe(1);
     expect(metrics.nights.find((n) => n.date === "2026-10-03")?.result).toBe("bench");
     expect(metrics.nights.find((n) => n.date === "2026-09-30")?.result).toBe("useful");
+  });
+
+  it("Yahoo C/LW eligibility uses an open LW slot when C is full", () => {
+    const dates = ["2026-09-29", "2026-10-03"];
+    const rosterGames = new Map<string, Set<string>>([
+      ["r1", new Set(dates)],
+      ["r2", new Set(dates)],
+    ]);
+    const slots = { ...DEFAULT_SLOTS, C: 2, LW: 1, RW: 0, D: 0, G: 0, UTIL: 0, BN: 4 };
+    const dual = evaluateCandidate({
+      slots,
+      roster: [
+        { id: "r1", positions: ["C"] },
+        { id: "r2", positions: ["C"] },
+      ],
+      rosterGames,
+      candidate: { id: "c", positions: ["C", "LW"] },
+      candidateGames: dates.map((date) => ({ date, opponent: "EDM", home: false })),
+      weeks: buildWeeks("2026-09-28", "2026-10-11", 1),
+    });
+    const centerOnly = evaluateCandidate({
+      slots,
+      roster: [
+        { id: "r1", positions: ["C"] },
+        { id: "r2", positions: ["C"] },
+      ],
+      rosterGames,
+      candidate: { id: "c", positions: ["C"] },
+      candidateGames: dates.map((date) => ({ date, opponent: "EDM", home: false })),
+      weeks: buildWeeks("2026-09-28", "2026-10-11", 1),
+    });
+    expect(dual.usefulStarts).toBe(2);
+    expect(dual.nights.every((n) => n.slot === "LW")).toBe(true);
+    expect(centerOnly.usefulStarts).toBe(0);
   });
 });
 
@@ -196,5 +231,14 @@ describe("name paste / search", () => {
 
   it("searches by last name prefix", () => {
     expect(searchPlayers("mcd", players)[0]?.lastName).toBe("McDavid");
+  });
+});
+
+describe("Yahoo eligibility toggles", () => {
+  it("keeps at least one position and canonical order", () => {
+    expect(toggleFantasyPosition(["C"], "LW")).toEqual(["C", "LW"]);
+    expect(formatEligibility(["LW", "C"])).toBe("C/LW");
+    expect(toggleFantasyPosition(["C"], "C")).toEqual(["C"]);
+    expect(toggleFantasyPosition(["C", "LW"], "C")).toEqual(["LW"]);
   });
 });

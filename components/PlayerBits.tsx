@@ -1,35 +1,50 @@
 "use client";
 
-import { FANTASY_POSITIONS } from "@/lib/types";
 import { t } from "@/lib/i18n";
+import { FANTASY_POSITIONS } from "@/lib/types";
 import type { FantasyPosition, Lang, NhlGame, NhlPlayer, RosterPlayer } from "@/lib/types";
 
 export function PositionPills({
   selected,
   onToggle,
+  size = "md",
+  labeled,
+  lang,
 }: {
   selected: FantasyPosition[];
   onToggle: (pos: FantasyPosition) => void;
+  size?: "sm" | "md";
+  labeled?: boolean;
+  lang?: Lang;
 }) {
+  const c = lang ? t(lang) : null;
+  const tap =
+    size === "md"
+      ? "min-h-9 min-w-10 px-2.5 py-1.5 text-xs"
+      : "px-1.5 py-0.5 text-[10px]";
   return (
-    <div className="flex flex-wrap gap-1">
-      {FANTASY_POSITIONS.map((pos) => {
-        const on = selected.includes(pos);
-        return (
-          <button
-            key={pos}
-            type="button"
-            onClick={() => onToggle(pos)}
-            className={`rounded px-1.5 py-0.5 font-mono text-[10px] tracking-wide ${
-              on
-                ? "bg-ice/20 text-ice"
-                : "bg-white/5 text-muted hover:text-white"
-            }`}
-          >
-            {pos}
-          </button>
-        );
-      })}
+    <div className="flex flex-col gap-1">
+      {labeled && c && (
+        <span className="text-[10px] uppercase tracking-wide text-muted">{c.positions}</span>
+      )}
+      <div className="flex flex-wrap gap-1" role="group" aria-label={c?.positions ?? "Yahoo"}>
+        {FANTASY_POSITIONS.map((pos) => {
+          const on = selected.includes(pos);
+          return (
+            <button
+              key={pos}
+              type="button"
+              onClick={() => onToggle(pos)}
+              aria-pressed={on}
+              className={`rounded-md font-mono tracking-wide ${tap} ${
+                on ? "bg-ice/25 text-ice ring-1 ring-ice/50" : "bg-white/5 text-muted hover:text-white"
+              }`}
+            >
+              {pos}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -77,13 +92,19 @@ export function PlayerRow({
             {c.nhlPos} {nhl?.position}
           </span>
         </div>
-        <PositionPills selected={roster.positions} onToggle={onTogglePos} />
+        <PositionPills
+          selected={roster.positions}
+          onToggle={onTogglePos}
+          size="md"
+          labeled
+          lang={lang}
+        />
         <MiniGames games={games} lang={lang} />
       </div>
       <button
         type="button"
         onClick={onRemove}
-        className="shrink-0 text-xs text-muted hover:text-bad"
+        className="min-h-9 min-w-9 shrink-0 text-lg text-muted hover:text-bad"
         aria-label={c.remove}
       >
         ×
