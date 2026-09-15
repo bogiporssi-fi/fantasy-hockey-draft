@@ -24,6 +24,7 @@ export function RosterPanel({
   onAdd,
   onRemove,
   onTogglePos,
+  onEditYahoo,
   onPaste,
   onClear,
 }: {
@@ -33,6 +34,7 @@ export function RosterPanel({
   onAdd: (player: NhlPlayer) => void;
   onRemove: (id: number) => void;
   onTogglePos: (id: number, pos: FantasyPosition) => void;
+  onEditYahoo: (id: number) => void;
   onPaste: () => void;
   onClear: () => void;
 }) {
@@ -120,6 +122,7 @@ export function RosterPanel({
                     lang={lang}
                     onRemove={() => onRemove(r.id)}
                     onTogglePos={(p) => onTogglePos(r.id, p)}
+                    onEditYahoo={() => onEditYahoo(r.id)}
                   />
                 ))}
               </div>
