@@ -11,8 +11,9 @@ import type {
   NightOutcome,
   WeekWindow,
 } from "@/lib/types";
-import { MiniGames, PositionPills } from "./PlayerBits";
+import { MiniGames } from "./PlayerBits";
 import { PlayerSearch } from "./PlayerSearch";
+import { YahooEligibilityBox } from "./YahooPositionSheet";
 
 function Heatmap({
   weeks,
@@ -152,6 +153,7 @@ export function CandidatePanel({
   games,
   onAddToCompare,
   onTogglePos,
+  onEditYahoo,
   onAddToRoster,
 }: {
   lang: Lang;
@@ -165,6 +167,7 @@ export function CandidatePanel({
   games: { date: string; opponent: string; home: boolean }[];
   onAddToCompare: (p: NhlPlayer) => void;
   onTogglePos: (pos: FantasyPosition) => void;
+  onEditYahoo: () => void;
   onAddToRoster: () => void;
 }) {
   const c = t(lang);
@@ -205,16 +208,13 @@ export function CandidatePanel({
                   {c.add}
                 </button>
               </div>
-              <p className="text-[11px] text-muted">
-                {c.nhlPos} {player.position}
-              </p>
               <div className="mt-2">
-                <PositionPills
-                  selected={positions}
-                  onToggle={onTogglePos}
-                  size="md"
-                  labeled
+                <YahooEligibilityBox
                   lang={lang}
+                  selected={positions}
+                  nhlPosition={player.position}
+                  onToggle={onTogglePos}
+                  onEdit={onEditYahoo}
                 />
               </div>
               <MiniGames games={upcoming} lang={lang} />

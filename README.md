@@ -27,7 +27,7 @@ npm run lint
    - H2H week start: Monday (or Sunday)
 2. **Build the roster as you draft** — search NHL names, or paste a list.
 3. **Pick candidates** — search adds them to the bottom **Vertailu** tray (several at once, not only A vs B). Each card shows useful nights / bench / complementarity vs the current roster. **Tyhjennä** clears the tray. Tap a card for the heatmap + H2H week table.
-4. **Yahoo eligibility** — on a roster row or compare card, tap **C / LW / RW / D / G**. NHL primary position is only the default; overlap scoring uses the Yahoo buttons (e.g. C/LW).
+4. **Yahoo eligibility** — search opens a **Yahoo-pelipaikat** sheet (C/LW/RW/D/G multi-select). NHL primary is only the default, not locked. Every roster row and compare card also has a **Yahoo-kelpoisuus** box + **Muokkaa**. Overlap scoring uses those buttons (e.g. C/LW).
 5. If you draft them, **Lisää kokoonpanoon** copies those Yahoo positions onto the roster.
 
 No Yahoo OAuth, no passwords. Category scoring projections are out of scope — schedule and slot utilization only.
@@ -70,7 +70,7 @@ Hypothesis check (in `lib/overlap.test.ts`): with two Toronto centers already ro
 
 No invented games. If the API is missing a team, the footer/status line lists it.
 
-Yahoo eligibility can differ from NHL primary position (C/LW etc.). Use the **Yahoo-kelpoisuus** buttons on each rostered player and each compare-tray candidate. Scoring uses those buttons, not the raw NHL single position.
+Yahoo eligibility is **manual** (not locked to NHL). Search opens a **Yahoo-pelipaikat** sheet; each roster/compare row has a **Yahoo-kelpoisuus** box and **Muokkaa**. Scoring uses those C/LW/RW/D/G toggles.
 
 ## Stack
 

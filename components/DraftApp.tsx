@@ -5,6 +5,7 @@ import { CompareTray } from "@/components/CompareTray";
 import { PasteModal } from "@/components/PasteModal";
 import { RosterPanel } from "@/components/RosterPanel";
 import { SettingsModal } from "@/components/SettingsModal";
+import { YahooPositionSheet } from "@/components/YahooPositionSheet";
 import { totalRosterLimit } from "@/lib/defaults";
 import { t } from "@/lib/i18n";
 import { evaluateCandidate } from "@/lib/overlap";
@@ -30,6 +31,11 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 const MAX_COMPARE = 12;
 
 type CompareEntry = { id: number; positions: FantasyPosition[] };
+type YahooEdit = {
+  player: NhlPlayer;
+  positions: FantasyPosition[];
+  mode: "roster-add" | "compare-add" | "roster-edit" | "compare-edit";
+};
 
 export function DraftApp() {
   const state = useSyncExternalStore(subscribeState, getStateSnapshot, getServerStateSnapshot);
@@ -40,6 +46,7 @@ export function DraftApp() {
   const [pasteOpen, setPasteOpen] = useState(false);
   const [tray, setTray] = useState<CompareEntry[]>([]);
   const [focusedId, setFocusedId] = useState<number | null>(null);
+  const [yahooEdit, setYahooEdit] = useState<YahooEdit | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
 
   function loadNhl() {
@@ -150,28 +157,61 @@ export function DraftApp() {
     });
   }
 
-  function addPlayer(player: NhlPlayer, positions?: FantasyPosition[]) {
-    if (!profile) return;
-    if (profile.roster.some((r) => r.id === player.id)) return;
+  function addPlayer(player: NhlPlayer, positions?: FantasyPosition[]): boolean {
+    if (!profile) return false;
+    if (profile.roster.some((r) => r.id === player.id)) return false;
     const cap = totalRosterLimit(profile.slots);
     if (profile.roster.length >= cap) {
       setFlash(c.rosterFull);
-      return;
+      return false;
     }
     const elig = positions?.length ? positions : [player.position];
     patchProfile([...profile.roster, { id: player.id, positions: elig }]);
+    return true;
   }
 
-  function addToTray(player: NhlPlayer) {
+  function addToTray(player: NhlPlayer, positions?: FantasyPosition[]) {
+    const elig = positions?.length ? positions : [player.position];
     setTray((cur) => {
-      if (cur.some((e) => e.id === player.id)) return cur;
+      if (cur.some((e) => e.id === player.id)) {
+        return cur.map((e) => (e.id === player.id ? { ...e, positions: elig } : e));
+      }
       if (cur.length >= MAX_COMPARE) {
         setFlash(c.compareFull.replace("{n}", String(MAX_COMPARE)));
         return cur;
       }
-      return [...cur, { id: player.id, positions: [player.position] }];
+      return [...cur, { id: player.id, positions: elig }];
     });
     setFocusedId(player.id);
+  }
+
+  function setRosterPositions(id: number, positions: FantasyPosition[]) {
+    if (!profile) return;
+    patchProfile(
+      profile.roster.map((r) => (r.id === id ? { ...r, positions } : r)),
+    );
+  }
+
+  function openYahoo(
+    player: NhlPlayer,
+    mode: YahooEdit["mode"],
+    existing?: FantasyPosition[],
+  ) {
+    setYahooEdit({
+      player,
+      positions: existing?.length ? existing : [player.position],
+      mode,
+    });
+  }
+
+  function confirmYahoo() {
+    if (!yahooEdit) return;
+    const { player, positions, mode } = yahooEdit;
+    if (mode === "roster-add" && !addPlayer(player, positions)) return;
+    if (mode === "compare-add") addToTray(player, positions);
+    if (mode === "roster-edit") setRosterPositions(player.id, positions);
+    if (mode === "compare-edit") addToTray(player, positions);
+    setYahooEdit(null);
   }
 
   function clearTray() {
@@ -305,9 +345,14 @@ export function DraftApp() {
               lang={lang}
               data={data}
               profile={profile}
-              onAdd={addPlayer}
+              onAdd={(p) => openYahoo(p, "roster-add")}
               onRemove={removePlayer}
               onTogglePos={togglePos}
+              onEditYahoo={(id) => {
+                const nhl = playerById.get(id);
+                const row = profile.roster.find((r) => r.id === id);
+                if (nhl && row) openYahoo(nhl, "roster-edit", row.positions);
+              }}
               onPaste={() => setPasteOpen(true)}
               onClear={() => {
                 if (confirm(c.confirmClear)) patchProfile([]);
@@ -323,9 +368,14 @@ export function DraftApp() {
               weeks={weeks}
               weekStartsOn={profile.weekStartsOn}
               games={focusedPlayer ? gamesOf(focusedPlayer) : []}
-              onAddToCompare={addToTray}
+              onAddToCompare={(p) => openYahoo(p, "compare-add")}
               onTogglePos={(pos) => {
                 if (focused) toggleTrayPos(focused.id, pos);
+              }}
+              onEditYahoo={() => {
+                if (focusedPlayer && focused) {
+                  openYahoo(focusedPlayer, "compare-edit", focused.positions);
+                }
               }}
               onAddToRoster={() => {
                 if (focusedPlayer) addPlayer(focusedPlayer, focused?.positions);
@@ -348,11 +398,16 @@ export function DraftApp() {
               })(),
             }))}
             focusedId={focused?.id ?? null}
-            onAdd={addToTray}
+            onAdd={(p) => openYahoo(p, "compare-add")}
             onFocus={setFocusedId}
             onRemove={removeFromTray}
             onClear={clearTray}
             onTogglePos={toggleTrayPos}
+            onEditYahoo={(id) => {
+              const nhl = playerById.get(id);
+              const entry = tray.find((e) => e.id === id);
+              if (nhl && entry) openYahoo(nhl, "compare-edit", entry.positions);
+            }}
             onAddToRoster={(id) => {
               const nhl = playerById.get(id);
               const entry = tray.find((e) => e.id === id);
@@ -391,9 +446,32 @@ export function DraftApp() {
             ]);
             setPasteOpen(false);
             setFlash(
-              take.length ? c.imported.replace("{n}", String(take.length)) : c.noneImported,
+              take.length
+                ? `${c.imported.replace("{n}", String(take.length))} ${c.importedYahooHint}`
+                : c.noneImported,
             );
           }}
+        />
+      )}
+      {yahooEdit && (
+        <YahooPositionSheet
+          lang={lang}
+          player={yahooEdit.player}
+          positions={yahooEdit.positions}
+          onToggle={(pos) =>
+            setYahooEdit((cur) =>
+              cur ? { ...cur, positions: toggleFantasyPosition(cur.positions, pos) } : cur,
+            )
+          }
+          onConfirm={confirmYahoo}
+          onCancel={() => setYahooEdit(null)}
+          confirmLabel={
+            yahooEdit.mode === "roster-add"
+              ? c.add
+              : yahooEdit.mode === "compare-add"
+                ? c.addCompareYahoo
+                : c.save
+          }
         />
       )}
     </div>
