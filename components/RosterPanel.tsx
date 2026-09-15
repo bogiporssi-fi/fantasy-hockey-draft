@@ -65,7 +65,7 @@ export function RosterPanel({
     <section className="flex h-full min-h-0 flex-col rounded-2xl border border-line bg-panel/80">
       <header className="flex items-start justify-between gap-2 border-b border-line px-4 py-3">
         <div>
-          <h2 className="text-sm font-semibold tracking-wide text-white">{c.roster}</h2>
+          <h2 className="text-base font-semibold tracking-tight text-white">{c.rosterStep}</h2>
           <p className={`text-xs tabular ${over ? "text-bad" : "text-muted"}`}>
             {profile.roster.length}/{cap} · {c.active} {activeCap}
             {over ? ` · ${c.overflow}` : ""}
@@ -75,7 +75,7 @@ export function RosterPanel({
           <button
             type="button"
             onClick={onPaste}
-            className="rounded-md border border-line px-2 py-1 text-xs text-ice hover:bg-ice/10"
+            className="rounded-md px-2 py-1 text-xs text-muted hover:text-ice"
           >
             {c.paste}
           </button>
@@ -95,16 +95,16 @@ export function RosterPanel({
           onPick={onAdd}
           placeholder={c.searchPlayer}
           excludeIds={rosterIds}
+          size="lg"
         />
-        <p className="mt-2 text-[11px] text-muted">{c.eligibilityHint}</p>
       </div>
       <div className="min-h-0 flex-1 overflow-auto px-3 pb-4">
         {profile.roster.length === 0 ? (
-          <p className="px-1 py-6 text-sm text-muted">{c.rosterEmpty}</p>
+          <p className="px-1 py-5 text-sm leading-relaxed text-white/80">{c.rosterEmpty}</p>
         ) : (
           ORDER.map((pos) => {
             const rows = byPrimary.get(pos) ?? [];
-            if (rows.length === 0 && profile.slots[pos] === 0) return null;
+            if (rows.length === 0) return null;
             return (
               <div key={pos} className="mb-3">
                 <div className="flex items-center justify-between px-1 pb-1">

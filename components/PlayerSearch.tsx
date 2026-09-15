@@ -11,12 +11,14 @@ export function PlayerSearch({
   onPick,
   placeholder,
   excludeIds,
+  size = "md",
 }: {
   lang: Lang;
   players: NhlPlayer[];
   onPick: (player: NhlPlayer) => void;
   placeholder?: string;
   excludeIds?: Set<number>;
+  size?: "md" | "lg";
 }) {
   const c = t(lang);
   const [query, setQuery] = useState("");
@@ -73,7 +75,9 @@ export function PlayerSearch({
           }
         }}
         placeholder={placeholder ?? c.typeToSearch}
-        className="w-full rounded-lg border border-line bg-[#08141d] px-3 py-2 text-sm text-white outline-none placeholder:text-muted/70 focus:border-ice/60"
+        className={`w-full rounded-lg border border-ice/35 bg-[#08141d] px-3 text-sm text-white outline-none placeholder:text-muted/80 focus:border-ice/70 ${
+          size === "lg" ? "min-h-12 py-3" : "min-h-11 py-2.5"
+        }`}
         aria-label={c.searchPlayer}
       />
       {open && query.trim().length >= 2 && (

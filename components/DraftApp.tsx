@@ -2,6 +2,7 @@
 
 import { CandidatePanel } from "@/components/CandidatePanel";
 import { CompareTray } from "@/components/CompareTray";
+import { DraftSteps } from "@/components/DraftSteps";
 import { PasteModal } from "@/components/PasteModal";
 import { RosterPanel } from "@/components/RosterPanel";
 import { SettingsModal } from "@/components/SettingsModal";
@@ -257,8 +258,8 @@ export function DraftApp() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[1400px] flex-col px-3 py-4 sm:px-5">
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto flex min-h-screen w-full max-w-[1400px] flex-col px-3 py-3 sm:px-5 sm:py-4">
+      <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           <Logo />
           <div>
@@ -271,7 +272,7 @@ export function DraftApp() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
-            className="rounded-lg border border-line bg-[#08141d] px-2 py-1.5 text-sm"
+            className="rounded-lg border border-line bg-[#08141d] px-2 py-1.5 text-sm text-muted"
             value={profile.id}
             onChange={(e) => updateState({ ...state, activeProfileId: e.target.value })}
           >
@@ -284,7 +285,7 @@ export function DraftApp() {
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
-            className="rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-white/5"
+            className="rounded-lg border border-line px-3 py-1.5 text-sm text-muted hover:bg-white/5 hover:text-white"
           >
             {c.settings}
           </button>
@@ -303,13 +304,7 @@ export function DraftApp() {
         </div>
       </header>
 
-      {data && (
-        <p className="mb-3 text-[11px] text-muted">
-          {data.teams.length} {c.teams} · {data.players.length} {c.players} · {c.updated}{" "}
-          {new Date(data.fetchedAt).toLocaleString(lang === "fi" ? "fi-FI" : "en-CA")}
-          {data.missingTeams.length > 0 ? ` · ${data.missingTeams.join(", ")}` : ""}
-        </p>
-      )}
+      <DraftSteps lang={lang} />
       {flash && (
         <p className="mb-3 text-sm text-warn">
           {flash}{" "}
@@ -340,7 +335,7 @@ export function DraftApp() {
 
       {data && (
         <>
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 pb-4 lg:grid-cols-[minmax(280px,380px)_1fr] lg:pb-0">
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(280px,380px)_1fr]">
             <RosterPanel
               lang={lang}
               data={data}
@@ -358,66 +353,103 @@ export function DraftApp() {
                 if (confirm(c.confirmClear)) patchProfile([]);
               }}
             />
-            <CandidatePanel
+            <div className="hidden min-h-[24rem] lg:block">
+              <CandidatePanel
+                lang={lang}
+                player={focusedPlayer}
+                positions={focused?.positions ?? []}
+                metrics={focusedMetrics}
+                weeks={weeks}
+                weekStartsOn={profile.weekStartsOn}
+                games={focusedPlayer ? gamesOf(focusedPlayer) : []}
+                onTogglePos={(pos) => {
+                  if (focused) toggleTrayPos(focused.id, pos);
+                }}
+                onEditYahoo={() => {
+                  if (focusedPlayer && focused) {
+                    openYahoo(focusedPlayer, "compare-edit", focused.positions);
+                  }
+                }}
+                onAddToRoster={() => {
+                  if (focusedPlayer) addPlayer(focusedPlayer, focused?.positions);
+                }}
+              />
+            </div>
+          </div>
+          <div className="mt-4">
+            <CompareTray
               lang={lang}
               players={data.players}
-              excludeIds={new Set(tray.map((e) => e.id))}
-              player={focusedPlayer}
-              positions={focused?.positions ?? []}
-              metrics={focusedMetrics}
-              weeks={weeks}
-              weekStartsOn={profile.weekStartsOn}
-              games={focusedPlayer ? gamesOf(focusedPlayer) : []}
-              onAddToCompare={(p) => openYahoo(p, "compare-add")}
-              onTogglePos={(pos) => {
-                if (focused) toggleTrayPos(focused.id, pos);
+              entries={tray.map((e) => ({
+                id: e.id,
+                positions: e.positions,
+                player: playerById.get(e.id),
+                metrics: trayMetrics.get(e.id) ?? null,
+                games: (() => {
+                  const nhl = playerById.get(e.id);
+                  if (!nhl) return [];
+                  const today = new Date().toISOString().slice(0, 10);
+                  return gamesOf(nhl).filter((g) => g.date >= today);
+                })(),
+              }))}
+              focusedId={focused?.id ?? null}
+              onAdd={(p) => openYahoo(p, "compare-add")}
+              onFocus={setFocusedId}
+              onRemove={removeFromTray}
+              onClear={clearTray}
+              onTogglePos={toggleTrayPos}
+              onEditYahoo={(id) => {
+                const nhl = playerById.get(id);
+                const entry = tray.find((e) => e.id === id);
+                if (nhl && entry) openYahoo(nhl, "compare-edit", entry.positions);
               }}
-              onEditYahoo={() => {
-                if (focusedPlayer && focused) {
-                  openYahoo(focusedPlayer, "compare-edit", focused.positions);
-                }
-              }}
-              onAddToRoster={() => {
-                if (focusedPlayer) addPlayer(focusedPlayer, focused?.positions);
+              onAddToRoster={(id) => {
+                const nhl = playerById.get(id);
+                const entry = tray.find((e) => e.id === id);
+                if (nhl) addPlayer(nhl, entry?.positions);
               }}
             />
           </div>
-          <CompareTray
-            lang={lang}
-            players={data.players}
-            entries={tray.map((e) => ({
-              id: e.id,
-              positions: e.positions,
-              player: playerById.get(e.id),
-              metrics: trayMetrics.get(e.id) ?? null,
-              games: (() => {
-                const nhl = playerById.get(e.id);
-                if (!nhl) return [];
-                const today = new Date().toISOString().slice(0, 10);
-                return gamesOf(nhl).filter((g) => g.date >= today);
-              })(),
-            }))}
-            focusedId={focused?.id ?? null}
-            onAdd={(p) => openYahoo(p, "compare-add")}
-            onFocus={setFocusedId}
-            onRemove={removeFromTray}
-            onClear={clearTray}
-            onTogglePos={toggleTrayPos}
-            onEditYahoo={(id) => {
-              const nhl = playerById.get(id);
-              const entry = tray.find((e) => e.id === id);
-              if (nhl && entry) openYahoo(nhl, "compare-edit", entry.positions);
-            }}
-            onAddToRoster={(id) => {
-              const nhl = playerById.get(id);
-              const entry = tray.find((e) => e.id === id);
-              if (nhl) addPlayer(nhl, entry?.positions);
-            }}
-          />
+          {focusedPlayer && (
+            <div className="mt-4 lg:hidden">
+              <CandidatePanel
+                lang={lang}
+                player={focusedPlayer}
+                positions={focused?.positions ?? []}
+                metrics={focusedMetrics}
+                weeks={weeks}
+                weekStartsOn={profile.weekStartsOn}
+                games={gamesOf(focusedPlayer)}
+                onTogglePos={(pos) => {
+                  if (focused) toggleTrayPos(focused.id, pos);
+                }}
+                onEditYahoo={() => {
+                  if (focusedPlayer && focused) {
+                    openYahoo(focusedPlayer, "compare-edit", focused.positions);
+                  }
+                }}
+                onAddToRoster={() => {
+                  addPlayer(focusedPlayer, focused?.positions);
+                }}
+              />
+            </div>
+          )}
         </>
       )}
 
-      <footer className="mt-6 space-y-1 text-[11px] leading-relaxed text-muted">
+      <footer className="mt-6 space-y-2 text-[11px] leading-relaxed text-muted">
+        {data && (
+          <p>
+            {data.teams.length} {c.teams} · {data.players.length} {c.players} · {c.updated}{" "}
+            {new Date(data.fetchedAt).toLocaleString(lang === "fi" ? "fi-FI" : "en-CA")}
+            {data.missingTeams.length > 0 ? ` · ${data.missingTeams.join(", ")}` : ""}
+          </p>
+        )}
+        <details className="rounded-lg border border-line px-3 py-2">
+          <summary className="cursor-pointer text-white/80">{c.howTitle}</summary>
+          <p className="mt-2 leading-relaxed">{c.howBody}</p>
+          <p className="mt-2 leading-relaxed">{c.goalieNote}</p>
+        </details>
         <p>{c.dataSource}</p>
         <p>{c.savedLocal}</p>
       </footer>

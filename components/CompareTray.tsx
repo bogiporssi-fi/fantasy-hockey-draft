@@ -54,19 +54,19 @@ export function CompareTray({
       : -1;
 
   return (
-    <section className="sticky bottom-0 z-20 mt-4 rounded-t-2xl border border-line bg-[#0b1822]/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_40px_rgba(0,0,0,0.45)] backdrop-blur lg:static lg:rounded-2xl lg:bg-panel/80 lg:shadow-none">
-      <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2 sm:px-4">
+    <section className="rounded-2xl border-2 border-ice/35 bg-[#0b1822] pb-[env(safe-area-inset-bottom)] shadow-[0_12px_40px_rgba(0,0,0,0.35)] lg:bg-panel/90">
+      <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-3 sm:px-4">
         <div>
-          <h2 className="text-sm font-semibold tracking-wide text-white">{c.compareTray}</h2>
-          <p className="text-[11px] text-muted">
-            {entries.length} · {c.compareHint}
+          <h2 className="text-base font-semibold tracking-tight text-white">{c.compareStep}</h2>
+          <p className="text-xs text-muted">
+            {entries.length} {c.players} · {c.compareHint}
           </p>
         </div>
         <button
           type="button"
           onClick={onClear}
           disabled={entries.length === 0}
-          className="min-h-9 rounded-md border border-line px-3 text-sm text-ice hover:bg-ice/10 disabled:opacity-40"
+          className="min-h-10 rounded-md px-3 text-sm text-muted hover:bg-white/5 hover:text-white disabled:opacity-40"
         >
           {c.clearCompare}
         </button>
@@ -78,11 +78,12 @@ export function CompareTray({
           onPick={onAdd}
           placeholder={c.compareSearch}
           excludeIds={inTray}
+          size="lg"
         />
         {entries.length === 0 ? (
-          <p className="pb-2 text-sm text-muted">{c.compareEmpty}</p>
+          <p className="pb-3 text-sm leading-relaxed text-white/80">{c.compareEmpty}</p>
         ) : (
-          <ul className="flex max-h-[42vh] flex-col gap-2 overflow-auto lg:max-h-none lg:grid lg:grid-cols-2 xl:grid-cols-3">
+          <ul className="flex max-h-[50vh] flex-col gap-3 overflow-auto lg:max-h-none lg:grid lg:grid-cols-2 xl:grid-cols-3">
             {entries.map((entry) => {
               const name = entry.player?.fullName ?? `#${entry.id}`;
               const m = entry.metrics;
@@ -92,8 +93,8 @@ export function CompareTray({
               return (
                 <li key={entry.id}>
                   <div
-                    className={`w-full rounded-xl border px-3 py-2 text-left ${
-                      selected ? "border-ice/60 bg-ice/10" : "border-line bg-[#08141d]"
+                    className={`w-full rounded-xl border px-3 py-2.5 text-left ${
+                      selected ? "border-ice/70 bg-ice/10" : "border-line bg-[#08141d]"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -105,11 +106,6 @@ export function CompareTray({
                         <div className="truncate text-sm font-medium text-white">{name}</div>
                         <div className="font-mono text-[11px] text-ice/80">
                           {entry.player?.team ?? "?"} · {formatEligibility(entry.positions)}
-                          {entry.player && (
-                            <span className="ml-1 text-muted">
-                              {c.nhlPos} {entry.player.position}
-                            </span>
-                          )}
                           {isBest && (
                             <span className="ml-2 text-[10px] uppercase text-good">{c.bestFit}</span>
                           )}
@@ -134,32 +130,33 @@ export function CompareTray({
                       />
                     </div>
                     {m && (
-                      <dl className="mt-2 grid grid-cols-4 gap-1 text-center">
-                        <div>
-                          <dt className="text-[9px] uppercase text-muted">{c.usefulShort}</dt>
-                          <dd className="text-sm font-semibold tabular text-good">{m.usefulStarts}</dd>
+                      <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        <div title={c.usefulHint}>
+                          <dt className="text-[11px] leading-tight text-muted">{c.usefulCard}</dt>
+                          <dd className="text-xl font-semibold tabular text-good">{m.usefulStarts}</dd>
                         </div>
-                        <div>
-                          <dt className="text-[9px] uppercase text-muted">{c.benchShort}</dt>
-                          <dd className="text-sm font-semibold tabular text-bad">
+                        <div title={c.benchHint}>
+                          <dt className="text-[11px] leading-tight text-muted">{c.benchCard}</dt>
+                          <dd className="text-xl font-semibold tabular text-bad">
                             {m.forcedBenchNights}
                           </dd>
                         </div>
-                        <div>
-                          <dt className="text-[9px] uppercase text-muted">{c.compShort}</dt>
-                          <dd className="text-sm font-semibold tabular">{m.complementarity}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-[9px] uppercase text-muted">{c.games}</dt>
-                          <dd className="text-sm font-semibold tabular">{m.totalGames}</dd>
+                        <div className="col-span-2 sm:col-span-1" title={c.compHint}>
+                          <dt className="text-[11px] leading-tight text-muted">{c.complementarity}</dt>
+                          <dd className="text-sm font-semibold tabular">
+                            {m.complementarity}
+                            <span className="ml-1 text-[11px] font-normal text-muted">
+                              / {m.totalGames} {c.games.toLowerCase()}
+                            </span>
+                          </dd>
                         </div>
                       </dl>
                     )}
-                    <div className="mt-2 flex flex-wrap gap-2">
+                    <div className="mt-2">
                       <button
                         type="button"
                         onClick={() => onAddToRoster(entry.id)}
-                        className="rounded-md border border-ice/40 px-2 py-1 text-[11px] text-ice"
+                        className="min-h-10 rounded-lg bg-ice/15 px-3 text-sm font-medium text-ice"
                       >
                         {c.add}
                       </button>
