@@ -1,6 +1,8 @@
 import { loadNhlData } from "@/lib/nhl";
 
+/** ISR: bake NHL schedule at build (works for CLI deploys) and refresh every 6h. */
 export const revalidate = 21600;
+export const maxDuration = 60;
 
 export async function GET() {
   try {
