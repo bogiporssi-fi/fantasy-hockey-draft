@@ -234,6 +234,147 @@ describe("name paste / search", () => {
   });
 });
 
+describe("Yahoo marks fully respected by scoring", () => {
+  const dates = ["2026-09-29", "2026-10-03", "2026-10-06"];
+  const weeks = buildWeeks("2026-09-28", "2026-10-11", 1);
+  const slots = {
+    ...DEFAULT_SLOTS,
+    C: 2,
+    LW: 2,
+    RW: 0,
+    D: 0,
+    G: 0,
+    UTIL: 0,
+    BN: 4,
+  };
+  const rosterGames = new Map<string, Set<string>>([
+    ["c1", new Set(dates)],
+    ["c2", new Set(dates)],
+  ]);
+  const twoCenters = [
+    { id: "c1", positions: ["C" as const] },
+    { id: "c2", positions: ["C" as const] },
+  ];
+  const games = dates.map((date) => ({ date, opponent: "EDM" as const, home: false }));
+
+  it("LW-only cannot consume a C slot even when C is open", () => {
+    const fill = assignNight([{ id: "winger", positions: ["LW"] }], {
+      ...DEFAULT_SLOTS,
+      C: 2,
+      LW: 2,
+      UTIL: 0,
+    });
+    expect(fill.started.get("winger")).toBe("LW");
+    expect(fill.remaining.C).toBe(2);
+    expect(fill.remaining.LW).toBe(1);
+
+    const noLw = assignNight([{ id: "winger", positions: ["LW"] }], {
+      ...DEFAULT_SLOTS,
+      C: 2,
+      LW: 0,
+      UTIL: 0,
+    });
+    expect(noLw.started.has("winger")).toBe(false);
+    expect(noLw.benched).toEqual(["winger"]);
+    expect(noLw.remaining.C).toBe(2);
+
+    const metrics = evaluateCandidate({
+      slots: { ...DEFAULT_SLOTS, C: 2, LW: 0, RW: 0, D: 0, G: 0, UTIL: 0, BN: 4 },
+      roster: [],
+      rosterGames: new Map(),
+      candidate: { id: "x", positions: ["LW"] },
+      candidateGames: games,
+      weeks,
+    });
+    expect(metrics.usefulStarts).toBe(0);
+    expect(metrics.forcedBenchNights).toBe(3);
+    expect(metrics.nights.every((n) => n.slot === null)).toBe(true);
+  });
+
+  it("C/LW can fill C when open, or LW when C is already full", () => {
+    const openC = assignNight([{ id: "dual", positions: ["C", "LW"] }], {
+      ...DEFAULT_SLOTS,
+      C: 1,
+      LW: 1,
+      UTIL: 0,
+    });
+    expect(openC.started.get("dual")).toBe("C");
+
+    const cFull = assignNight(
+      [
+        { id: "c1", positions: ["C"] },
+        { id: "dual", positions: ["C", "LW"] },
+      ],
+      { ...DEFAULT_SLOTS, C: 1, LW: 1, UTIL: 0 },
+    );
+    expect(cFull.started.get("c1")).toBe("C");
+    expect(cFull.started.get("dual")).toBe("LW");
+  });
+
+  it("changing Yahoo marks changes useful vs forced-bench counts", () => {
+    const base = {
+      slots,
+      roster: twoCenters,
+      rosterGames,
+      candidateGames: games,
+      weeks,
+    };
+    const asC = evaluateCandidate({ ...base, candidate: { id: "x", positions: ["C"] } });
+    const asLw = evaluateCandidate({ ...base, candidate: { id: "x", positions: ["LW"] } });
+    const asDual = evaluateCandidate({
+      ...base,
+      candidate: { id: "x", positions: ["C", "LW"] },
+    });
+
+    expect(asC.usefulStarts).toBe(0);
+    expect(asC.forcedBenchNights).toBe(3);
+    expect(asC.nights.every((n) => n.slot === null)).toBe(true);
+
+    expect(asLw.usefulStarts).toBe(3);
+    expect(asLw.forcedBenchNights).toBe(0);
+    expect(asLw.nights.every((n) => n.slot === "LW")).toBe(true);
+
+    expect(asDual.usefulStarts).toBe(3);
+    expect(asDual.forcedBenchNights).toBe(0);
+    expect(asDual.nights.every((n) => n.slot === "LW")).toBe(true);
+
+    expect(asLw.usefulStarts).toBeGreaterThan(asC.usefulStarts);
+    expect(asDual.forcedBenchNights).toBeLessThan(asC.forcedBenchNights);
+  });
+
+  it("UTIL is only used when the league profile has remaining UTIL", () => {
+    const cFullNoUtil = pickSlot(["C"], {
+      C: 0,
+      LW: 2,
+      RW: 0,
+      D: 0,
+      G: 0,
+      UTIL: 0,
+    });
+    expect(cFullNoUtil).toBeNull();
+
+    const cFullWithUtil = pickSlot(["C"], {
+      C: 0,
+      LW: 2,
+      RW: 0,
+      D: 0,
+      G: 0,
+      UTIL: 1,
+    });
+    expect(cFullWithUtil).toBe("UTIL");
+
+    const lwOnlyIgnoresOpenC = pickSlot(["LW"], {
+      C: 2,
+      LW: 0,
+      RW: 0,
+      D: 0,
+      G: 0,
+      UTIL: 0,
+    });
+    expect(lwOnlyIgnoresOpenC).toBeNull();
+  });
+});
+
 describe("Yahoo eligibility toggles", () => {
   it("keeps at least one position and canonical order", () => {
     expect(toggleFantasyPosition(["C"], "LW")).toEqual(["C", "LW"]);

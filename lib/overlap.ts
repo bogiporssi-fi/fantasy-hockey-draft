@@ -7,6 +7,7 @@ import type {
   WeekMetrics,
   WeekWindow,
 } from "./types";
+import { FANTASY_POSITIONS } from "./types";
 import { addDays } from "./weeks";
 
 export interface EligiblePlayer {
@@ -31,13 +32,32 @@ export function emptyRemaining(slots: SlotConfig): Record<StartSlot, number> {
   };
 }
 
+/** Only Yahoo marks on the player. Never NHL default, never an unmarked slot. */
+export function yahooMarks(positions: FantasyPosition[]): FantasyPosition[] {
+  const allowed = new Set<FantasyPosition>(FANTASY_POSITIONS);
+  const seen = new Set<FantasyPosition>();
+  const out: FantasyPosition[] = [];
+  for (const pos of positions) {
+    if (!allowed.has(pos) || seen.has(pos)) continue;
+    seen.add(pos);
+    out.push(pos);
+  }
+  return out;
+}
+
+/**
+ * Place a player only into an active slot they marked (C/LW/RW/D/G).
+ * UTIL is not a Yahoo mark — it is used only when the league profile still
+ * has remaining UTIL capacity.
+ */
 export function pickSlot(
   positions: FantasyPosition[],
   remaining: Record<StartSlot, number>,
 ): StartSlot | null {
+  const marks = yahooMarks(positions);
   let best: FantasyPosition | null = null;
   let bestRem = Infinity;
-  for (const pos of positions) {
+  for (const pos of marks) {
     const rem = remaining[pos] ?? 0;
     if (rem > 0 && rem < bestRem) {
       best = pos;
@@ -45,13 +65,13 @@ export function pickSlot(
     }
   }
   if (best) return best;
-  if (remaining.UTIL > 0) return "UTIL";
+  if ((remaining.UTIL ?? 0) > 0) return "UTIL";
   return null;
 }
 
 /**
- * Greedy nightly assignment: lock single-eligibility players first, then
- * fill the most constrained remaining eligible slot. UTIL is last resort.
+ * Greedy nightly assignment from each player's Yahoo marks only.
+ * Narrower eligibility first, then the tightest remaining marked slot.
  */
 export function assignNight(players: EligiblePlayer[], slots: SlotConfig): NightFill {
   const remaining = emptyRemaining(slots);
@@ -59,7 +79,7 @@ export function assignNight(players: EligiblePlayer[], slots: SlotConfig): Night
   const benched: string[] = [];
 
   const sorted = [...players].sort((a, b) => {
-    const diff = a.positions.length - b.positions.length;
+    const diff = yahooMarks(a.positions).length - yahooMarks(b.positions).length;
     if (diff !== 0) return diff;
     return a.id.localeCompare(b.id);
   });
@@ -82,7 +102,7 @@ export function openEligibleSlots(
   positions: FantasyPosition[],
 ): number {
   let open = 0;
-  for (const pos of positions) open += remaining[pos] ?? 0;
+  for (const pos of yahooMarks(positions)) open += remaining[pos] ?? 0;
   open += remaining.UTIL ?? 0;
   return open;
 }

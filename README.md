@@ -70,7 +70,7 @@ Hypothesis check (in `lib/overlap.test.ts`): with two Toronto centers already ro
 
 No invented games. If the API is missing a team, the footer/status line lists it.
 
-Yahoo eligibility is **manual** (not locked to NHL). Search opens a **Yahoo-pelipaikat** sheet; each roster/compare row has a **Yahoo-kelpoisuus** box and **Muokkaa**. Scoring uses those C/LW/RW/D/G toggles.
+Yahoo eligibility is **manual** (not locked to NHL) and **fully used in scoring**. Search opens a **Yahoo-pelipaikat** sheet; each roster/compare row has a **Yahoo-kelpoisuus** box and **Muokkaa**. Nightly greedy fill may only start a player in a slot they marked (C/LW/RW/D/G). UTIL is used only if the kimppa profile still has UTIL. LW-only never takes a C slot.
 
 ## Stack
 

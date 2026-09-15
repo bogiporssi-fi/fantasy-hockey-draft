@@ -66,7 +66,7 @@ const fi = {
     "Maalivahdeilla otteluilta = joukkueen ottelu, ei varmistettu aloitus. Skataereilla sama: ohjelma, ei kokoonpanovarmistus.",
   howTitle: "Miten laskenta toimii",
   howBody:
-    "Jokainen otteluilta: nykyinen kokoonpano täyttää aktiivipaikat ahneesti (yksiselitteinen Yahoo-kelpoisuus ensin). Ehdokas saa hyödyllisen illan vain jos hänen Yahoo-paikoilleen tai UTIL-paikalle jää tilaa. Penkki-ilta = ottelu, kun paikat ovat jo täynnä. Ei Yahoo-kirjautumista, ei pistemääräennusteita.",
+    "Jokainen otteluilta: nykyinen kokoonpano täyttää aktiivipaikat ahneesti (kapeampi merkitty Yahoo-kelpoisuus ensin). Pelaaja saa aktiivi-illan vain sille paikalle, jonka merkkasit (C / LW / RW / D / G) — LW-merkintä ei koskaan vie C-paikkaa. UTIL-paikkaan vain, jos kimpassa on UTIL. Ehdokas on hyödyllinen vain jos tällainen paikka on vielä auki. Penkki-ilta = ottelu, kun merkittyjä paikkoja ei jää. Ei Yahoo-kirjautumista, ei pistemääräennusteita.",
   dataSource: "Otteluohjelma ja pelaajat: NHL Web API (api-web.nhle.com), ei keksittyjä otteluita.",
   savedLocal: "Kimpat ja kokoonpano tallentuvat tähän selaimeen.",
   legendUseful: "Mahtuu avoimeen paikkaan",
@@ -102,7 +102,7 @@ const fi = {
   noGames: "Ei runkosarjaotteluita tälle joukkueelle.",
   compareHint: "Sama kokoonpano, monta ehdokasta. Yahoo-kelpoisuus = napit C/LW/RW/D/G.",
   eligibilityHint:
-    "Jokaiselle pelaajalle merkitään Yahoo-kelpoisuus itse (C/LW/RW/D/G). Haku avaa valitsimen — NHL ei lukitse paikkoja.",
+    "Jokaiselle pelaajalle merkitään Yahoo-kelpoisuus itse (C/LW/RW/D/G). Laskenta käyttää vain näitä merkintöjä. Haku avaa valitsimen — NHL ei lukitse paikkoja.",
   confirmClear: "Tyhjennetäänkö kokoonpano?",
   confirmDelete: "Poistetaanko tämä kimppa-profiili?",
   compareFull: "Vertailussa on jo {n} ehdokasta.",
@@ -174,7 +174,7 @@ const en: typeof fi = {
     "For goalies, a game night is their team’s game — not a confirmed start. Skaters: schedule only, not lineup locks.",
   howTitle: "How scoring works",
   howBody:
-    "Each game night: the current roster fills active slots greedily (narrower Yahoo eligibility first). A candidate gets a useful night only if an eligible Yahoo slot or UTIL is still open. Bench night = they play when those slots are already full. No Yahoo login, no category projections.",
+    "Each game night: the current roster fills active slots greedily (narrower marked Yahoo eligibility first). A player is started only in a slot they marked (C/LW/RW/D/G) — LW-only never takes C. UTIL only if the league still has UTIL. A candidate is useful only if such a slot is still open. Bench night = they play when marked slots are already full. No Yahoo login, no category projections.",
   dataSource: "Schedule and players from the NHL Web API (api-web.nhle.com). No invented games.",
   savedLocal: "League profiles and roster are saved in this browser.",
   legendUseful: "Fits an open slot",
@@ -210,7 +210,7 @@ const en: typeof fi = {
   noGames: "No regular-season games for this team.",
   compareHint: "Same roster, several candidates. Yahoo eligibility = C/LW/RW/D/G buttons.",
   eligibilityHint:
-    "You mark Yahoo eligibility for every player (C/LW/RW/D/G). Search opens the picker — NHL does not lock positions.",
+    "You mark Yahoo eligibility for every player (C/LW/RW/D/G). Scoring uses only those marks. Search opens the picker — NHL does not lock positions.",
   confirmClear: "Clear the roster?",
   confirmDelete: "Delete this league profile?",
   compareFull: "Compare tray already has {n} candidates.",
