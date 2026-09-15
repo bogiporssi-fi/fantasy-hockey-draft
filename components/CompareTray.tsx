@@ -59,7 +59,7 @@ export function CompareTray({
         <div>
           <h2 className="text-base font-semibold tracking-tight text-white">{c.compareStep}</h2>
           <p className="text-xs text-muted">
-            {entries.length} {c.players} · {c.compareHint}
+            {entries.length} {c.candidatesCount} · {c.compareHint}
           </p>
         </div>
         <button
@@ -132,22 +132,20 @@ export function CompareTray({
                     {m && (
                       <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                         <div title={c.usefulHint}>
-                          <dt className="text-[11px] leading-tight text-muted">{c.usefulCard}</dt>
+                          <dt className="text-[11px] leading-tight text-muted hyphens-none">{c.usefulCard}</dt>
                           <dd className="text-xl font-semibold tabular text-good">{m.usefulStarts}</dd>
                         </div>
                         <div title={c.benchHint}>
-                          <dt className="text-[11px] leading-tight text-muted">{c.benchCard}</dt>
+                          <dt className="text-[11px] leading-tight text-muted hyphens-none">{c.benchCard}</dt>
                           <dd className="text-xl font-semibold tabular text-bad">
                             {m.forcedBenchNights}
                           </dd>
                         </div>
                         <div className="col-span-2 sm:col-span-1" title={c.compHint}>
-                          <dt className="text-[11px] leading-tight text-muted">{c.complementarity}</dt>
+                          <dt className="text-[11px] leading-tight text-muted hyphens-none">{c.complementarity}</dt>
                           <dd className="text-sm font-semibold tabular">
                             {m.complementarity}
-                            <span className="ml-1 text-[11px] font-normal text-muted">
-                              / {m.totalGames} {c.games.toLowerCase()}
-                            </span>
+                            <span className="ml-1 text-[11px] font-normal text-muted">/ 100</span>
                           </dd>
                         </div>
                       </dl>
