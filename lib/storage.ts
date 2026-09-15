@@ -59,6 +59,7 @@ export function saveState(state: AppState) {
 type Listener = () => void;
 const listeners = new Set<Listener>();
 let clientCache: AppState | null = null;
+const SERVER_SNAPSHOT = defaultState();
 
 export function subscribeState(listener: Listener) {
   listeners.add(listener);
@@ -71,7 +72,7 @@ export function getStateSnapshot(): AppState {
 }
 
 export function getServerStateSnapshot(): AppState {
-  return defaultState();
+  return SERVER_SNAPSHOT;
 }
 
 export function setAppState(next: AppState) {

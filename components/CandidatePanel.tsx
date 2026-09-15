@@ -393,6 +393,7 @@ export function CandidatePanel({
 
         {candidateA && metricsA && (
           <>
+            <WeekTable metrics={metricsA} lang={lang} />
             <div className="flex flex-wrap gap-3 text-[11px] text-muted">
               <span className="flex items-center gap-1">
                 <i className="inline-block h-2.5 w-2.5 rounded-sm bg-good/80" /> {c.legendUseful}
@@ -410,7 +411,17 @@ export function CandidatePanel({
               weekStartsOn={weekStartsOn}
               lang={lang}
             />
-            <WeekTable metrics={metricsA} lang={lang} />
+            {compareOn && metricsB && (
+              <>
+                <h3 className="text-[11px] uppercase tracking-wide text-muted">{c.candidateB}</h3>
+                <Heatmap
+                  weeks={weeks}
+                  nights={metricsB.nights}
+                  weekStartsOn={weekStartsOn}
+                  lang={lang}
+                />
+              </>
+            )}
             <div>
               <h3 className="mb-2 text-[11px] uppercase tracking-wide text-muted">
                 {c.next}
