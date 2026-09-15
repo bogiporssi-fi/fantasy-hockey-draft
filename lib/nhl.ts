@@ -46,14 +46,23 @@ function loc(value: Localized): string {
 }
 
 async function nhlJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${NHL}${path}`, {
-    headers: { Accept: "application/json" },
-    next: { revalidate: 6 * 60 * 60 },
-  });
-  if (!res.ok) {
-    throw new Error(`NHL ${path} → ${res.status}`);
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const res = await fetch(`${NHL}${path}`, {
+        headers: { Accept: "application/json", "User-Agent": "luistin-draft-helper" },
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        throw new Error(`NHL ${path} → ${res.status}`);
+      }
+      return (await res.json()) as T;
+    } catch (err) {
+      lastError = err;
+      await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+    }
   }
-  return (await res.json()) as T;
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -150,7 +159,7 @@ export async function loadNhlData(): Promise<NhlPayload> {
   const players: NhlPlayer[] = [];
   const seenPlayers = new Set<number>();
 
-  const results = await mapPool(teams, 6, async (team) => {
+  const results = await mapPool(teams, 3, async (team) => {
     const abbrev = team.abbrev;
     try {
       const [schedule, roster] = await Promise.all([

@@ -79,3 +79,19 @@ Yahoo eligibility can differ from NHL primary position (C/LW etc.). Click the po
 ## Stack
 
 Next.js (App Router) + TypeScript + Tailwind. No auth. Switch kimppa profiles in the header/settings for different league slot configs.
+
+## Deploy (phone / HTTPS)
+
+Roster and kimppa profiles stay in **this browser’s `localStorage`**. HTTPS does not change that — no Yahoo OAuth, no server login. Data is per device and per origin (a new Vercel URL is a new empty roster).
+
+This repo is not linked to a Vercel project from CI. One-click on the **bogiporssi-fi** Vercel account (GitHub already connected):
+
+1. Open [Import this GitHub repo on Vercel](https://vercel.com/new/clone?repository-url=https://github.com/bogiporssi-fi/fantasy-hockey-draft).
+2. Sign in as the same account that owns `bogiporssi-fi` (Google/GitHub/email — whatever you already use on Vercel).
+3. Import **fantasy-hockey-draft**, Framework Preset **Next.js**, Root **./**
+4. Deploy **Production** from `main`. Leave Deployment Protection / SSO **off** so the phone can open the URL without a Vercel login.
+5. Open the `*.vercel.app` URL on the phone. First NHL load can take a few seconds.
+
+CLI (if you have a token): `npm i -g vercel && vercel login && vercel --prod --yes`
+
+No env vars are required.
