@@ -12,7 +12,6 @@ import type {
   WeekWindow,
 } from "@/lib/types";
 import { MiniGames } from "./PlayerBits";
-import { PlayerSearch } from "./PlayerSearch";
 import { YahooEligibilityBox } from "./YahooPositionSheet";
 
 function Heatmap({
@@ -143,29 +142,23 @@ function NightList({ nights, lang }: { nights: NightOutcome[]; lang: Lang }) {
 
 export function CandidatePanel({
   lang,
-  players,
-  excludeIds,
   player,
   positions,
   metrics,
   weeks,
   weekStartsOn,
   games,
-  onAddToCompare,
   onTogglePos,
   onEditYahoo,
   onAddToRoster,
 }: {
   lang: Lang;
-  players: NhlPlayer[];
-  excludeIds: Set<number>;
   player: NhlPlayer | null;
   positions: FantasyPosition[];
   metrics: CandidateMetrics | null;
   weeks: WeekWindow[];
   weekStartsOn: 0 | 1;
   games: { date: string; opponent: string; home: boolean }[];
-  onAddToCompare: (p: NhlPlayer) => void;
   onTogglePos: (pos: FantasyPosition) => void;
   onEditYahoo: () => void;
   onAddToRoster: () => void;
@@ -176,19 +169,11 @@ export function CandidatePanel({
   return (
     <section className="flex h-full min-h-0 flex-col rounded-2xl border border-line bg-panel/80">
       <header className="border-b border-line px-4 py-3">
-        <h2 className="text-sm font-semibold tracking-wide text-white">{c.candidate}</h2>
-        <p className="text-xs text-muted">{c.compareHint}</p>
+        <h2 className="text-base font-semibold tracking-tight text-white">{c.detailsTitle}</h2>
+        <p className="text-xs text-muted">{c.pickFromTray}</p>
       </header>
       <div className="min-h-0 flex-1 space-y-4 overflow-auto px-4 py-3">
-        <PlayerSearch
-          lang={lang}
-          players={players}
-          onPick={onAddToCompare}
-          placeholder={c.compareSearch}
-          excludeIds={excludeIds}
-        />
-
-        {!player && <p className="text-sm text-muted">{c.noCandidate}</p>}
+        {!player && <p className="text-sm leading-relaxed text-white/80">{c.noCandidate}</p>}
 
         {player && metrics && (
           <>
@@ -203,7 +188,7 @@ export function CandidatePanel({
                 <button
                   type="button"
                   onClick={onAddToRoster}
-                  className="rounded-md border border-ice/40 px-2 py-0.5 text-[11px] text-ice hover:bg-ice/10"
+                  className="min-h-10 rounded-lg bg-ice/15 px-3 text-sm font-medium text-ice"
                 >
                   {c.add}
                 </button>
@@ -220,29 +205,29 @@ export function CandidatePanel({
               <MiniGames games={upcoming} lang={lang} />
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="rounded-xl border border-line bg-[#08141d] px-3 py-3">
-                <div className="text-[11px] uppercase tracking-wide text-muted">{c.usefulStarts}</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl border border-line bg-[#08141d] px-3 py-3" title={c.usefulHint}>
+                <div className="text-xs text-muted">{c.usefulCard}</div>
                 <div className="mt-1 text-2xl font-semibold tabular text-good">{metrics.usefulStarts}</div>
                 <div className="mt-1 text-xs text-muted">
                   {metrics.totalGames} {c.games.toLowerCase()}
                 </div>
               </div>
-              <div className="rounded-xl border border-line bg-[#08141d] px-3 py-3">
-                <div className="text-[11px] uppercase tracking-wide text-muted">{c.forcedBench}</div>
+              <div className="rounded-xl border border-line bg-[#08141d] px-3 py-3" title={c.benchHint}>
+                <div className="text-xs text-muted">{c.benchCard}</div>
                 <div
                   className={`mt-1 text-2xl font-semibold tabular ${metrics.forcedBenchNights > 0 ? "text-bad" : "text-white"}`}
                 >
                   {metrics.forcedBenchNights}
                 </div>
               </div>
-              <div className="rounded-xl border border-line bg-[#08141d] px-3 py-3">
-                <div className="text-[11px] uppercase tracking-wide text-muted">{c.complementarity}</div>
+              <div className="rounded-xl border border-line bg-[#08141d] px-3 py-3" title={c.compHint}>
+                <div className="text-xs text-muted">{c.complementarity}</div>
                 <div className="mt-1 text-2xl font-semibold tabular">{metrics.complementarity}</div>
                 <div className="mt-1 text-xs text-muted">0–100</div>
               </div>
               <div className="rounded-xl border border-line bg-[#08141d] px-3 py-3">
-                <div className="text-[11px] uppercase tracking-wide text-muted">{c.utilization}</div>
+                <div className="text-xs text-muted">{c.utilization}</div>
                 <div className="mt-1 text-2xl font-semibold tabular">
                   {Math.round(metrics.utilization * 100)}%
                 </div>
@@ -269,12 +254,6 @@ export function CandidatePanel({
             {games.length === 0 && <p className="text-sm text-bad">{c.noGames}</p>}
           </>
         )}
-
-        <details className="rounded-lg border border-line px-3 py-2 text-sm text-muted">
-          <summary className="cursor-pointer text-white/90">{c.howTitle}</summary>
-          <p className="mt-2 leading-relaxed">{c.howBody}</p>
-          <p className="mt-2 leading-relaxed">{c.goalieNote}</p>
-        </details>
       </div>
     </section>
   );

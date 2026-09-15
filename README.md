@@ -20,15 +20,16 @@ npm run lint
 
 ## Draft-night workflow (Yahoo)
 
-1. **Settings** — confirm active slots. Default (editable, saved as named profiles):
-   - Active: 2 C, 2 LW, 2 RW, 4 D, 2 G
-   - Bench: 4
-   - Optional UTIL (default 0)
-   - H2H week start: Monday (or Sunday)
-2. **Build the roster as you draft** — search NHL names, or paste a list.
-3. **Pick candidates** — search adds them to the bottom **Vertailu** tray (several at once, not only A vs B). Each card shows useful nights / bench / complementarity vs the current roster. **Tyhjennä** clears the tray. Tap a card for the heatmap + H2H week table.
-4. **Yahoo eligibility** — search opens a **Yahoo-pelipaikat** sheet (C/LW/RW/D/G multi-select). NHL primary is only the default, not locked. Every roster row and compare card also has a **Yahoo-kelpoisuus** box + **Muokkaa**. Overlap scoring uses those buttons (e.g. C/LW).
-5. If you draft them, **Lisää kokoonpanoon** copies those Yahoo positions onto the roster.
+Numbered in the Finnish UI (always visible):
+
+1. **Kokoonpano** — search a player you already drafted, or paste a list.
+2. **Yahoo-paikat** — mark C/LW/RW/D/G as in Yahoo. NHL primary is only a default.
+3. **Vertailu** — add candidates you are considering (several at once).
+4. **Hyöty / Penkki** — useful nights vs forced-bench nights vs the current roster. **Tyhjennä** clears the tray. Tap a card for the week calendar (on a phone this opens below Vertailu).
+
+Default slots (Settings → named kimppa profiles): 2 C, 2 LW, 2 RW, 4 D, 2 G, bench 4, UTIL 0. H2H week start Monday (or Sunday).
+
+If you draft them, **Lisää kokoonpanoon** copies those Yahoo positions onto the roster.
 
 No Yahoo OAuth, no passwords. Category scoring projections are out of scope — schedule and slot utilization only.
 

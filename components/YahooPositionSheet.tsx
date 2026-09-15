@@ -32,9 +32,9 @@ export function YahooPositionSheet({
           <span className="font-mono text-sm text-ice/80">{player.team}</span>
         </p>
         <p className="mt-2 text-sm leading-relaxed text-muted">{c.yahooSheetHelp}</p>
+        <p className="mt-1 text-sm text-ice/90">{c.yahooNhlDefaultHint}</p>
         <p className="mt-1 text-xs text-muted">
-          {c.yahooSheetNhl}: <span className="font-mono text-white/80">{player.position}</span> —{" "}
-          {c.yahooNotLocked}
+          {c.yahooSheetNhl}: <span className="font-mono text-white/80">{player.position}</span>
         </p>
         <div className="mt-4 grid grid-cols-5 gap-2">
           {FANTASY_POSITIONS.map((pos) => {
@@ -96,15 +96,19 @@ export function YahooEligibilityBox({
 }) {
   const c = t(lang);
   return (
-    <div className="mt-1.5 rounded-lg border border-ice/35 bg-ice/[0.07] p-2">
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-ice">
-          {c.positions}
-        </span>
+    <div className="mt-1.5 rounded-lg border border-ice/40 bg-ice/[0.08] p-2.5">
+      <div className="mb-1 flex items-start justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold text-ice">{c.positions}</p>
+          <p className="text-[11px] leading-snug text-muted">
+            {c.yahooNhlDefaultHint}
+            {nhlPosition ? ` (${c.nhlPos} ${nhlPosition})` : ""}
+          </p>
+        </div>
         <button
           type="button"
           onClick={onEdit}
-          className="min-h-8 rounded-md bg-ice/20 px-2 text-[11px] font-medium text-ice"
+          className="min-h-9 shrink-0 rounded-md bg-ice/20 px-2.5 text-xs font-medium text-ice"
         >
           {c.editYahoo}
         </button>
@@ -118,7 +122,8 @@ export function YahooEligibilityBox({
               type="button"
               onClick={() => onToggle(pos)}
               aria-pressed={on}
-              className={`min-h-10 min-w-11 rounded-md font-mono text-xs font-semibold ${
+              aria-label={`${c.positions} ${pos}`}
+              className={`min-h-11 min-w-12 rounded-md font-mono text-sm font-semibold ${
                 on ? "bg-ice text-rink" : "bg-black/30 text-muted"
               }`}
             >
@@ -127,9 +132,6 @@ export function YahooEligibilityBox({
           );
         })}
       </div>
-      <p className="mt-1.5 text-[10px] text-muted">
-        {c.nhlPos} {nhlPosition ?? "—"} · {c.yahooNotLocked} · {formatEligibility(selected)}
-      </p>
     </div>
   );
 }
