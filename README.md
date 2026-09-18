@@ -14,7 +14,7 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000). First load fetches the current NHL regular-season schedule and club rosters from the public NHL Web API (`api-web.nhle.com`). That can take a few seconds, then it is cached on the server.
 
 ```bash
-npm test    # overlap scoring + name matching
+npm test    # overlap scoring, name matching, luck classification
 npm run lint
 ```
 
@@ -25,7 +25,7 @@ Numbered in the Finnish UI (always visible):
 1. **Kokoonpano** — search a player you already drafted, or paste a list.
 2. **Yahoo-paikat** — mark C/LW/RW/D/G as in Yahoo. NHL primary is only a default.
 3. **Vertailu** — add candidates you are considering (several at once).
-4. **Hyöty / Penkki** — useful nights vs forced-bench nights vs the current roster. **Tyhjennä** clears the tray. Tap a card for the week calendar (on a phone this opens below Vertailu).
+4. **Hyöty / Penkki** — useful nights vs forced-bench nights vs the current roster. **Tyhjennä** clears the tray. Tap a card for the week calendar (on a phone this opens below Vertailu). Last season **Onni / epäonni** sits under those schedule numbers and does not replace them.
 
 Default slots (Settings → named kimppa profiles): 2 C, 2 LW, 2 RW, 4 D, 2 G, bench 4, UTIL 0. H2H week start Monday (or Sunday).
 
@@ -68,8 +68,24 @@ Hypothesis check (in `lib/overlap.test.ts`): with two Toronto centers already ro
 - Players: `GET https://api-web.nhle.com/v1/roster/{TEAM}/current`
 - Schedule: `GET https://api-web.nhle.com/v1/club-schedule-season/{TEAM}/now`
 - Season bounds: `GET https://api-web.nhle.com/v1/schedule/now`
+- Last-season luck (Onni / epäonni): MoneyPuck free season CSVs, cached at `GET /api/luck` for 7 days
+  - Skaters: `https://moneypuck.com/moneypuck/playerData/seasonSummary/2024/regular/skaters.csv`
+  - Goalies: `https://moneypuck.com/moneypuck/playerData/seasonSummary/2024/regular/goalies.csv`
+  - Data page / credit: [MoneyPuck.com data](https://moneypuck.com/data.htm) (free for non-commercial use)
+  - Mapping: MoneyPuck `playerId` is the NHL id; unique-name fallback if needed
 
 No invented games. If the API is missing a team, the footer/status line lists it.
+
+### Onni / epäonni (draft-night luck)
+
+On a Vertailu candidate (and the focused calendar), Luistin shows a compact **Onni / epäonni** read for **NHL 2024–25**:
+
+- **Maalit vs xG** — actual goals vs MoneyPuck expected goals (all situations). The main finishing-luck signal.
+- **Viimeistely %** — shooting % vs the xG-implied rate on the same shot volume.
+- **PDO 5v5** — on-ice shooting % + on-ice save % (≈100 is typical). Teammate/goalie luck while they were on the ice.
+- Short Finnish verdict: *todennäköisesti onnekas / epäonnekas / neutraali* plus one line why.
+
+This is **not** a skill ranking. xG cannot see finishing talent; elite snipers look “lucky.” Unlucky last year can bounce; lucky can regress. Skaters are first-class; goalies use GA vs xGA instead of PDO. Missing or tiny samples show an empty/thin state.
 
 Yahoo eligibility is **manual** (not locked to NHL) and **fully used in scoring**. Search opens a **Yahoo-pelipaikat** sheet; each roster/compare row has a **Yahoo-kelpoisuus** box and **Muokkaa**. Nightly greedy fill may only start a player in a slot they marked (C/LW/RW/D/G). UTIL is used only if the kimppa profile still has UTIL. LW-only never takes a C slot.
 

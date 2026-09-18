@@ -9,6 +9,8 @@ import { SettingsModal } from "@/components/SettingsModal";
 import { YahooPositionSheet } from "@/components/YahooPositionSheet";
 import { totalRosterLimit } from "@/lib/defaults";
 import { t } from "@/lib/i18n";
+import type { LuckPayload, LuckReport } from "@/lib/luck";
+import { normalizeName } from "@/lib/names";
 import { evaluateCandidate } from "@/lib/overlap";
 import { toggleFantasyPosition } from "@/lib/positions";
 import {
@@ -49,6 +51,8 @@ export function DraftApp() {
   const [focusedId, setFocusedId] = useState<number | null>(null);
   const [yahooEdit, setYahooEdit] = useState<YahooEdit | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [luckPayload, setLuckPayload] = useState<LuckPayload | null>(null);
+  const [luckLoading, setLuckLoading] = useState(true);
 
   function loadNhl() {
     setLoadingNhl(true);
@@ -84,6 +88,24 @@ export function DraftApp() {
     return () => ac.abort();
   }, []);
 
+  useEffect(() => {
+    const ac = new AbortController();
+    fetch("/api/luck", { signal: ac.signal })
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "luck error");
+        setLuckPayload(json as LuckPayload);
+      })
+      .catch(() => {
+        if (ac.signal.aborted) return;
+        setLuckPayload(null);
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setLuckLoading(false);
+      });
+    return () => ac.abort();
+  }, []);
+
   const lang: Lang = state.lang;
   const c = t(lang);
   const profile = state.profiles.find((p) => p.id === state.activeProfileId) ?? state.profiles[0];
@@ -96,6 +118,27 @@ export function DraftApp() {
   const playerById = useMemo(() => {
     return new Map(data?.players.map((p) => [p.id, p]) ?? []);
   }, [data]);
+
+  const luckByName = useMemo(() => {
+    const map = new Map<string, LuckReport[]>();
+    if (!luckPayload) return map;
+    for (const r of Object.values(luckPayload.players)) {
+      const key = normalizeName(r.name);
+      if (!key) continue;
+      map.set(key, [...(map.get(key) ?? []), r]);
+    }
+    return map;
+  }, [luckPayload]);
+
+  function luckOf(player: NhlPlayer | null | undefined): LuckReport | null | undefined {
+    if (!player) return null;
+    if (!luckPayload) return luckLoading ? undefined : null;
+    const direct = luckPayload.players[String(player.id)];
+    if (direct) return direct;
+    const named = luckByName.get(normalizeName(player.fullName));
+    if (named?.length === 1) return named[0];
+    return null;
+  }
 
   function gamesOf(player: NhlPlayer | RosterPlayer | null | undefined) {
     if (!data || !player) return [];
@@ -362,6 +405,8 @@ export function DraftApp() {
                 weeks={weeks}
                 weekStartsOn={profile.weekStartsOn}
                 games={focusedPlayer ? gamesOf(focusedPlayer) : []}
+                luck={luckOf(focusedPlayer)}
+                luckLoading={luckLoading}
                 onTogglePos={(pos) => {
                   if (focused) toggleTrayPos(focused.id, pos);
                 }}
@@ -380,11 +425,13 @@ export function DraftApp() {
             <CompareTray
               lang={lang}
               players={data.players}
+              luckLoading={luckLoading}
               entries={tray.map((e) => ({
                 id: e.id,
                 positions: e.positions,
                 player: playerById.get(e.id),
                 metrics: trayMetrics.get(e.id) ?? null,
+                luck: luckOf(playerById.get(e.id)),
                 games: (() => {
                   const nhl = playerById.get(e.id);
                   if (!nhl) return [];
@@ -420,6 +467,8 @@ export function DraftApp() {
                 weeks={weeks}
                 weekStartsOn={profile.weekStartsOn}
                 games={gamesOf(focusedPlayer)}
+                luck={luckOf(focusedPlayer)}
+                luckLoading={luckLoading}
                 onTogglePos={(pos) => {
                   if (focused) toggleTrayPos(focused.id, pos);
                 }}
@@ -451,6 +500,7 @@ export function DraftApp() {
           <p className="mt-2 leading-relaxed">{c.goalieNote}</p>
         </details>
         <p>{c.dataSource}</p>
+        <p>{c.luckSource}</p>
         <p>{c.savedLocal}</p>
       </footer>
 
