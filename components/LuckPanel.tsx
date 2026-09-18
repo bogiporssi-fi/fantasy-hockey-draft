@@ -219,15 +219,13 @@ function MiniMetric({
   pct?: boolean;
 }) {
   const show = pct ? fmtPct(metric.current) : fmt1(metric.current);
-  const deltaBits = [
-    metric.delta == null ? "Δ —" : `Δ ${fmtSigned(metric.delta)}`,
-    metric.delta2 != null ? `Δ2 ${fmtSigned(metric.delta2)}` : null,
-  ].filter(Boolean);
   return (
     <div>
       <div className="text-[10px] leading-tight text-muted">{label}</div>
       <div className="text-sm font-semibold tabular text-white">{show}</div>
-      <div className={`text-[10px] tabular ${deltaClass(metric.delta)}`}>{deltaBits.join(" · ")}</div>
+      <div className={`text-[10px] tabular ${deltaClass(metric.delta)}`}>
+        {metric.delta == null ? "Δ —" : `Δ ${fmtSigned(metric.delta)}`}
+      </div>
       {metric.trend.some((v) => v != null) && (
         <div className="text-[10px] tabular text-muted">{fmtTrend(metric.trend)}</div>
       )}

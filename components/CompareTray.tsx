@@ -88,7 +88,7 @@ export function CompareTray({
         {entries.length === 0 ? (
           <p className="pb-3 text-sm leading-relaxed text-white/80">{c.compareEmpty}</p>
         ) : (
-          <ul className="flex max-h-[50vh] flex-col gap-3 overflow-auto lg:max-h-none lg:grid lg:grid-cols-2 xl:grid-cols-3">
+          <ul className="flex max-h-[70vh] flex-col gap-3 overflow-auto lg:max-h-none lg:grid lg:grid-cols-2 xl:grid-cols-3">
             {entries.map((entry) => {
               const name = entry.player?.fullName ?? `#${entry.id}`;
               const m = entry.metrics;
