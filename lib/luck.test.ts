@@ -5,16 +5,27 @@ import {
   finishDirection,
   GOALIE_GA_XG,
   goalieReport,
+  ipp,
   lookupLuck,
+  metricDelta,
   pdo,
   pdoDirection,
   shootingPct,
   SKATER_MIN_GAMES,
   SKATER_MIN_SHOTS,
   skaterReport,
+  trendMetric,
   type SkaterLuckInput,
 } from "./luck";
-import { indexLuckReports, parseCsv, reportsFromGoalieCsv, reportsFromSkaterCsv, splitCsvLine } from "./moneypuck";
+import {
+  indexLuckReports,
+  mergeSkaterYears,
+  parseCsv,
+  parseSkaterSeasonCsv,
+  reportsFromGoalieCsv,
+  reportsFromSkaterCsv,
+  splitCsvLine,
+} from "./moneypuck";
 import { normalizeName } from "./names";
 
 const enough: SkaterLuckInput = {
@@ -233,6 +244,7 @@ describe("report builders", () => {
     expect(r.kind).toBe("skater");
     expect(r.goalsMinusXg).toBe(0);
     expect(r.pdo).toBe(100);
+    expect(r.sh5v5.current).toBeNull();
   });
 
   it("fills goalie display fields", () => {
@@ -245,5 +257,50 @@ describe("report builders", () => {
     expect(r.savePct).toBe(90);
     expect(r.expectedSavePct).toBe(89);
     expect(r.goalsMinusXg).toBe(10);
+    expect(r.ipp.current).toBeNull();
   });
 });
+
+describe("IPP / 5v5 SH% / trends", () => {
+  it("computes IPP with a minimum on-ice goal sample", () => {
+    expect(ipp(38, 51)).toBe(74.5);
+    expect(ipp(3, 5)).toBeNull();
+    expect(ipp(4, 5, 5)).toBe(80);
+  });
+
+  it("builds deltas vs prior 1–2 seasons", () => {
+    expect(metricDelta(9.4, 11.5)).toBe(-2.1);
+    expect(metricDelta(9.4, null)).toBeNull();
+    const t = trendMetric([8.8, 11.5, 9.4]);
+    expect(t.current).toBe(9.4);
+    expect(t.delta).toBe(-2.1);
+    expect(t.delta2).toBe(0.6);
+    expect(t.trend).toEqual([8.8, 11.5, 9.4]);
+  });
+
+  it("assembles Frozen Tools-style 5v5 SH%, IPP and PP-IPP with a 3-season trend", () => {
+    const csv = `playerId,season,name,situation,games_played,icetime,I_F_goals,I_F_xGoals,I_F_shotsOnGoal,I_F_points,OnIce_F_goals,OnIce_F_shotsOnGoal,OnIce_A_goals,OnIce_A_shotsOnGoal
+1,2022,Test,all,80,96000,20,20,200,60,80,800,80,800
+1,2022,Test,5on5,80,72000,12,12,120,40,55,550,50,550
+1,2022,Test,5on4,80,9600,6,6,40,16,22,120,2,20
+1,2023,Test,all,80,96000,28,22,200,70,90,800,80,800
+1,2023,Test,5on5,80,72000,18,14,120,50,60,550,50,550
+1,2023,Test,5on4,80,9600,8,6,40,20,25,120,2,20
+1,2024,Test,all,80,96000,20,26,200,55,80,800,80,800
+1,2024,Test,5on5,80,72000,12,16,160,38,51,550,50,550
+1,2024,Test,5on4,80,9600,6,7,40,24,30,120,2,20
+`;
+    const [r] = mergeSkaterYears([parseSkaterSeasonCsv(csv)]);
+    expect(r.sh5v5.current).toBe(7.5); // 12/160
+    expect(r.sh5v5.delta).toBe(-7.5); // vs 18/120 = 15
+    expect(r.sh5v5.trend).toEqual([10, 15, 7.5]);
+    expect(r.ipp.current).toBe(68.8); // 55/80
+    expect(r.ipp5v5.current).toBe(74.5); // 38/51
+    expect(r.ppIpp.current).toBe(80); // 24/30
+    expect(r.ppIpp.trend[0]).toBe(72.7); // 16/22
+    expect(r.toi5v5).toBe(15);
+    expect(r.toiPp).toBe(2);
+    expect(r.label).toBe("unlucky");
+  });
+});
+

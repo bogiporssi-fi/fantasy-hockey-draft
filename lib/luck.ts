@@ -2,10 +2,15 @@
 
 export const LUCK_SEASON = 2024;
 export const LUCK_SEASON_LABEL = "2024–25";
+/** Oldest → newest seasons used for Frozen Tools-style trends. */
+export const LUCK_YEARS = [2022, 2023, 2024] as const;
 
 export const SKATER_MIN_GAMES = 20;
 export const SKATER_MIN_SHOTS = 40;
+export const SKATER_MIN_SHOTS_5V5 = 20;
 export const SKATER_MIN_ONICE_SHOTS = 80;
+export const IPP_MIN_ONICE_GOALS = 8;
+export const PP_IPP_MIN_ONICE_GOALS = 5;
 export const FINISH_GOALS_XG = 5;
 export const FINISH_SH_PP = 3;
 /** Mild PDO: used when finishing is average. */
@@ -34,6 +39,19 @@ export type LuckWhy =
 
 export type LuckKind = "skater" | "goalie";
 
+export interface SituationStats {
+  gamesPlayed: number;
+  iceTime: number;
+  goals: number;
+  xGoals: number;
+  shotsOnGoal: number;
+  points: number;
+  onIceGoalsFor: number;
+  onIceShotsFor: number;
+  onIceGoalsAgainst: number;
+  onIceShotsAgainst: number;
+}
+
 export interface SkaterLuckInput {
   gamesPlayed: number;
   goals: number;
@@ -57,6 +75,18 @@ export interface LuckClassification {
   why: LuckWhy;
 }
 
+export interface TrendMetric {
+  current: number | null;
+  /** vs previous season (percentage points). */
+  delta: number | null;
+  /** vs two seasons ago. */
+  delta2: number | null;
+  /** Oldest → newest, aligned to LUCK_YEARS. */
+  trend: (number | null)[];
+}
+
+export const EMPTY_TREND: TrendMetric = { current: null, delta: null, delta2: null, trend: [] };
+
 export interface LuckReport {
   playerId: number;
   name: string;
@@ -75,6 +105,13 @@ export interface LuckReport {
   xGoalsAgainst: number | null;
   savePct: number | null;
   expectedSavePct: number | null;
+  sh5v5: TrendMetric;
+  ipp: TrendMetric;
+  ipp5v5: TrendMetric;
+  ppIpp: TrendMetric;
+  onIceSh5v5: number | null;
+  toi5v5: number | null;
+  toiPp: number | null;
 }
 
 export function round1(n: number): number {
@@ -89,6 +126,46 @@ export function ratePct(numer: number, denom: number): number | null {
 /** Individual shooting % vs xG-implied rate on the same shot volume. */
 export function shootingPct(goals: number, shotsOnGoal: number): number | null {
   return ratePct(goals, shotsOnGoal);
+}
+
+export function shootingPctMinShots(goals: number, shotsOnGoal: number, minShots: number): number | null {
+  if (shotsOnGoal < minShots) return null;
+  return shootingPct(goals, shotsOnGoal);
+}
+
+/** IPP = player points / on-ice goals for. */
+export function ipp(points: number, onIceGoals: number, minGoals: number = IPP_MIN_ONICE_GOALS): number | null {
+  if (onIceGoals < minGoals) return null;
+  return ratePct(points, onIceGoals);
+}
+
+export function toiPerGame(iceTimeSeconds: number, gamesPlayed: number): number | null {
+  if (!(gamesPlayed > 0) || !(iceTimeSeconds > 0)) return null;
+  return round1(iceTimeSeconds / gamesPlayed / 60);
+}
+
+export function metricDelta(current: number | null, prior: number | null): number | null {
+  if (current == null || prior == null) return null;
+  return round1(current - prior);
+}
+
+export function trendMetric(valuesOldestToNewest: (number | null)[]): TrendMetric {
+  const n = valuesOldestToNewest.length;
+  const current = n ? (valuesOldestToNewest[n - 1] ?? null) : null;
+  const prev = n >= 2 ? (valuesOldestToNewest[n - 2] ?? null) : null;
+  const prev2 = n >= 3 ? (valuesOldestToNewest[n - 3] ?? null) : null;
+  return {
+    current,
+    delta: metricDelta(current, prev),
+    delta2: metricDelta(current, prev2),
+    trend: valuesOldestToNewest,
+  };
+}
+
+export function seasonShortLabel(season: number): string {
+  const y = season % 100;
+  const next = (season + 1) % 100;
+  return `${String(y).padStart(2, "0")}–${String(next).padStart(2, "0")}`;
 }
 
 /**
@@ -207,6 +284,84 @@ export function skaterReport(
     xGoalsAgainst: null,
     savePct: null,
     expectedSavePct: null,
+    sh5v5: EMPTY_TREND,
+    ipp: EMPTY_TREND,
+    ipp5v5: EMPTY_TREND,
+    ppIpp: EMPTY_TREND,
+    onIceSh5v5: null,
+    toi5v5: null,
+    toiPp: null,
+  };
+}
+
+export interface YearSlice {
+  season: number;
+  all?: SituationStats;
+  five?: SituationStats;
+  pp?: SituationStats;
+}
+
+function sliceIpp(s: SituationStats | undefined, minGoals: number): number | null {
+  if (!s) return null;
+  return ipp(s.points, s.onIceGoalsFor, minGoals);
+}
+
+function sliceSh(s: SituationStats | undefined, minShots: number): number | null {
+  if (!s) return null;
+  return shootingPctMinShots(s.goals, s.shotsOnGoal, minShots);
+}
+
+export function assembleSkaterReport(playerId: number, name: string, years: YearSlice[]): LuckReport {
+  const byYear = new Map(years.map((y) => [y.season, y]));
+  const latest =
+    byYear.get(LUCK_SEASON) ??
+    [...years].sort((a, b) => a.season - b.season).at(-1);
+  const all = latest?.all;
+  const five = latest?.five;
+  const pp = latest?.pp;
+
+  const base = skaterReport(
+    playerId,
+    name,
+    all
+      ? {
+          gamesPlayed: all.gamesPlayed,
+          goals: all.goals,
+          xGoals: all.xGoals,
+          shotsOnGoal: all.shotsOnGoal,
+          onIceGoalsFor: five?.onIceGoalsFor ?? all.onIceGoalsFor,
+          onIceShotsFor: five?.onIceShotsFor ?? all.onIceShotsFor,
+          onIceGoalsAgainst: five?.onIceGoalsAgainst ?? all.onIceGoalsAgainst,
+          onIceShotsAgainst: five?.onIceShotsAgainst ?? all.onIceShotsAgainst,
+        }
+      : {
+          gamesPlayed: five?.gamesPlayed ?? 0,
+          goals: five?.goals ?? 0,
+          xGoals: five?.xGoals ?? 0,
+          shotsOnGoal: five?.shotsOnGoal ?? 0,
+          onIceGoalsFor: five?.onIceGoalsFor ?? 0,
+          onIceShotsFor: five?.onIceShotsFor ?? 0,
+          onIceGoalsAgainst: five?.onIceGoalsAgainst ?? 0,
+          onIceShotsAgainst: five?.onIceShotsAgainst ?? 0,
+        },
+    five ?? null,
+  );
+
+  const ordered = LUCK_YEARS.map((season) => byYear.get(season));
+  const shTrend = ordered.map((y) => sliceSh(y?.five, SKATER_MIN_SHOTS_5V5));
+  const ippTrend = ordered.map((y) => sliceIpp(y?.all, IPP_MIN_ONICE_GOALS));
+  const ipp5Trend = ordered.map((y) => sliceIpp(y?.five, IPP_MIN_ONICE_GOALS));
+  const ppTrend = ordered.map((y) => sliceIpp(y?.pp, PP_IPP_MIN_ONICE_GOALS));
+
+  return {
+    ...base,
+    sh5v5: trendMetric([...shTrend]),
+    ipp: trendMetric([...ippTrend]),
+    ipp5v5: trendMetric([...ipp5Trend]),
+    ppIpp: trendMetric([...ppTrend]),
+    onIceSh5v5: five ? shootingPctMinShots(five.onIceGoalsFor, five.onIceShotsFor, SKATER_MIN_ONICE_SHOTS) : null,
+    toi5v5: five ? toiPerGame(five.iceTime, five.gamesPlayed) : null,
+    toiPp: pp ? toiPerGame(pp.iceTime, pp.gamesPlayed) : null,
   };
 }
 
@@ -232,6 +387,13 @@ export function goalieReport(playerId: number, name: string, input: GoalieLuckIn
     xGoalsAgainst: round1(input.xGoalsAgainst),
     savePct,
     expectedSavePct: xSavePct,
+    sh5v5: EMPTY_TREND,
+    ipp: EMPTY_TREND,
+    ipp5v5: EMPTY_TREND,
+    ppIpp: EMPTY_TREND,
+    onIceSh5v5: null,
+    toi5v5: null,
+    toiPp: null,
   };
 }
 

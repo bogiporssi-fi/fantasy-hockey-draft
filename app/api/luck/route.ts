@@ -2,7 +2,7 @@ import { loadLuckPayload } from "@/lib/moneypuck";
 
 /** Completed 2024–25 MoneyPuck snapshot — weekly ISR (must be a numeric literal). */
 export const revalidate = 604800;
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function GET() {
   try {

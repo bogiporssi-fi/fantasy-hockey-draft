@@ -1,12 +1,14 @@
 import { normalizeName } from "./names";
 import {
+  assembleSkaterReport,
   goalieReport,
   LUCK_SEASON,
   LUCK_SEASON_LABEL,
-  skaterReport,
+  LUCK_YEARS,
   type LuckPayload,
   type LuckReport,
-  type SkaterLuckInput,
+  type SituationStats,
+  type YearSlice,
 } from "./luck";
 
 export const MONEYPCK_DATA_PAGE = "https://moneypuck.com/data.htm";
@@ -15,12 +17,11 @@ export const MONEYPCK_SKATERS_CSV =
 export const MONEYPCK_GOALIES_CSV =
   "https://moneypuck.com/moneypuck/playerData/seasonSummary/2024/regular/goalies.csv";
 
-interface SkaterRow {
-  playerId: number;
-  name: string;
-  situation: string;
-  input: SkaterLuckInput;
+export function skatersCsvUrl(season: number): string {
+  return `https://moneypuck.com/moneypuck/playerData/seasonSummary/${season}/regular/skaters.csv`;
 }
+
+type NamedYear = YearSlice & { playerId: number; name: string };
 
 function num(row: Record<string, string>, key: string): number {
   const v = Number.parseFloat(row[key] ?? "");
@@ -73,50 +74,68 @@ export function splitCsvLine(line: string): string[] {
   return out;
 }
 
-function skaterFromRow(row: Record<string, string>): SkaterRow | null {
-  const playerId = Number.parseInt(row.playerId ?? "", 10);
-  if (!Number.isFinite(playerId) || playerId <= 0) return null;
+function situationFromRow(row: Record<string, string>): SituationStats {
   return {
-    playerId,
-    name: row.name ?? "",
-    situation: row.situation ?? "",
-    input: {
-      gamesPlayed: num(row, "games_played"),
-      goals: num(row, "I_F_goals"),
-      xGoals: num(row, "I_F_xGoals"),
-      shotsOnGoal: num(row, "I_F_shotsOnGoal"),
-      onIceGoalsFor: num(row, "OnIce_F_goals"),
-      onIceShotsFor: num(row, "OnIce_F_shotsOnGoal"),
-      onIceGoalsAgainst: num(row, "OnIce_A_goals"),
-      onIceShotsAgainst: num(row, "OnIce_A_shotsOnGoal"),
-    },
+    gamesPlayed: num(row, "games_played"),
+    iceTime: num(row, "icetime"),
+    goals: num(row, "I_F_goals"),
+    xGoals: num(row, "I_F_xGoals"),
+    shotsOnGoal: num(row, "I_F_shotsOnGoal"),
+    points: num(row, "I_F_points"),
+    onIceGoalsFor: num(row, "OnIce_F_goals"),
+    onIceShotsFor: num(row, "OnIce_F_shotsOnGoal"),
+    onIceGoalsAgainst: num(row, "OnIce_A_goals"),
+    onIceShotsAgainst: num(row, "OnIce_A_shotsOnGoal"),
   };
 }
 
-export function reportsFromSkaterCsv(text: string): LuckReport[] {
-  const grouped = new Map<number, { name: string; all?: SkaterLuckInput; five?: SkaterLuckInput }>();
+export function parseSkaterSeasonCsv(text: string): NamedYear[] {
+  const grouped = new Map<string, NamedYear>();
   for (const row of parseCsv(text)) {
-    const parsed = skaterFromRow(row);
-    if (!parsed) continue;
-    const cur = grouped.get(parsed.playerId) ?? { name: parsed.name };
-    cur.name = parsed.name || cur.name;
-    if (parsed.situation === "all") cur.all = parsed.input;
-    if (parsed.situation === "5on5") cur.five = parsed.input;
-    grouped.set(parsed.playerId, cur);
+    const playerId = Number.parseInt(row.playerId ?? "", 10);
+    if (!Number.isFinite(playerId) || playerId <= 0) continue;
+    const season = Number.parseInt(row.season ?? "", 10);
+    const sit = row.situation ?? "";
+    const yr = Number.isFinite(season) ? season : LUCK_SEASON;
+    const key = `${playerId}:${yr}`;
+    const cur =
+      grouped.get(key) ??
+      ({
+        playerId,
+        name: row.name ?? "",
+        season: yr,
+      } satisfies NamedYear);
+    if (row.name) cur.name = row.name;
+    const stats = situationFromRow(row);
+    if (sit === "all") cur.all = stats;
+    else if (sit === "5on5") cur.five = stats;
+    else if (sit === "5on4") cur.pp = stats;
+    grouped.set(key, cur);
+  }
+  return [...grouped.values()];
+}
+
+/** Single-season reports (tests). Production uses mergeSkaterYears. */
+export function reportsFromSkaterCsv(text: string): LuckReport[] {
+  return parseSkaterSeasonCsv(text)
+    .filter((y) => y.all)
+    .map((y) => assembleSkaterReport(y.playerId, y.name, [y]));
+}
+
+export function mergeSkaterYears(seasons: NamedYear[][]): LuckReport[] {
+  const byId = new Map<number, { name: string; years: YearSlice[] }>();
+  for (const list of seasons) {
+    for (const y of list) {
+      const cur = byId.get(y.playerId) ?? { name: y.name, years: [] };
+      if (y.name) cur.name = y.name;
+      cur.years.push(y);
+      byId.set(y.playerId, cur);
+    }
   }
   const reports: LuckReport[] = [];
-  for (const [id, g] of grouped) {
-    if (!g.all) continue;
-    reports.push(
-      skaterReport(id, g.name, g.all, g.five
-        ? {
-            onIceGoalsFor: g.five.onIceGoalsFor,
-            onIceShotsFor: g.five.onIceShotsFor,
-            onIceGoalsAgainst: g.five.onIceGoalsAgainst,
-            onIceShotsAgainst: g.five.onIceShotsAgainst,
-          }
-        : null),
-    );
+  for (const [id, g] of byId) {
+    if (!g.years.some((y) => y.all || y.five)) continue;
+    reports.push(assembleSkaterReport(id, g.name, g.years));
   }
   return reports;
 }
@@ -178,14 +197,30 @@ async function fetchCsv(url: string): Promise<string> {
 }
 
 export async function loadLuckPayload(): Promise<LuckPayload> {
-  const [skaterCsv, goalieCsv] = await Promise.all([
-    fetchCsv(MONEYPCK_SKATERS_CSV),
+  const skaterUrls = LUCK_YEARS.map((y) => skatersCsvUrl(y));
+  const settled = await Promise.allSettled([
     fetchCsv(MONEYPCK_GOALIES_CSV),
+    ...skaterUrls.map((url) => fetchCsv(url)),
   ]);
-  const reports = [...reportsFromSkaterCsv(skaterCsv), ...reportsFromGoalieCsv(goalieCsv)];
+  const goalieCsv = settled[0].status === "fulfilled" ? settled[0].value : "";
+  const skaterCsvs = settled.slice(1).map((s) => (s.status === "fulfilled" ? s.value : ""));
+  const parsedYears = skaterCsvs.filter(Boolean).map((text) => parseSkaterSeasonCsv(text));
+  const files = [
+    ...skaterUrls,
+    MONEYPCK_GOALIES_CSV,
+  ];
+  const reports = [
+    ...mergeSkaterYears(parsedYears),
+    ...(goalieCsv ? reportsFromGoalieCsv(goalieCsv) : []),
+  ];
   const players: Record<string, LuckReport> = {};
   for (const r of reports) {
+    // Skater rows win if a player appears in both (should not happen).
+    if (players[String(r.playerId)] && r.kind === "goalie") continue;
     players[String(r.playerId)] = r;
+  }
+  if (Object.keys(players).length === 0) {
+    throw new Error("MoneyPuck returned no luck stats");
   }
   return {
     season: LUCK_SEASON,
@@ -194,8 +229,8 @@ export async function loadLuckPayload(): Promise<LuckPayload> {
     source: {
       name: "MoneyPuck",
       url: MONEYPCK_DATA_PAGE,
-      files: [MONEYPCK_SKATERS_CSV, MONEYPCK_GOALIES_CSV],
-      note: "Free for non-commercial use; credit MoneyPuck.com. NHL playerId mapping.",
+      files,
+      note: "Free for non-commercial use; credit MoneyPuck.com. Frozen Tools-style rates (5v5 SH%, IPP, PP-IPP) computed from these CSVs — not Dobber data.",
     },
     players,
   };
