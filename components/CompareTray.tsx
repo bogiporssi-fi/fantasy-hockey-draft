@@ -3,8 +3,10 @@
 import { MiniGames } from "./PlayerBits";
 import { PlayerSearch } from "./PlayerSearch";
 import { YahooEligibilityBox } from "./YahooPositionSheet";
+import { LuckPanel } from "./LuckPanel";
 import { t } from "@/lib/i18n";
 import { formatEligibility } from "@/lib/positions";
+import type { LuckReport } from "@/lib/luck";
 import type {
   CandidateMetrics,
   FantasyPosition,
@@ -19,6 +21,7 @@ export interface CompareEntryView {
   player: NhlPlayer | undefined;
   metrics: CandidateMetrics | null;
   games: NhlGame[];
+  luck?: LuckReport | null;
 }
 
 export function CompareTray({
@@ -26,6 +29,7 @@ export function CompareTray({
   players,
   entries,
   focusedId,
+  luckLoading,
   onAdd,
   onFocus,
   onRemove,
@@ -38,6 +42,7 @@ export function CompareTray({
   players: NhlPlayer[];
   entries: CompareEntryView[];
   focusedId: number | null;
+  luckLoading?: boolean;
   onAdd: (player: NhlPlayer) => void;
   onFocus: (id: number) => void;
   onRemove: (id: number) => void;
@@ -83,7 +88,7 @@ export function CompareTray({
         {entries.length === 0 ? (
           <p className="pb-3 text-sm leading-relaxed text-white/80">{c.compareEmpty}</p>
         ) : (
-          <ul className="flex max-h-[50vh] flex-col gap-3 overflow-auto lg:max-h-none lg:grid lg:grid-cols-2 xl:grid-cols-3">
+          <ul className="flex max-h-[70vh] flex-col gap-3 overflow-auto lg:max-h-none lg:grid lg:grid-cols-2 xl:grid-cols-3">
             {entries.map((entry) => {
               const name = entry.player?.fullName ?? `#${entry.id}`;
               const m = entry.metrics;
@@ -150,6 +155,12 @@ export function CompareTray({
                         </div>
                       </dl>
                     )}
+                    <LuckPanel
+                      lang={lang}
+                      report={entry.luck}
+                      loading={luckLoading && entry.luck === undefined}
+                      compact
+                    />
                     <div className="mt-2">
                       <button
                         type="button"

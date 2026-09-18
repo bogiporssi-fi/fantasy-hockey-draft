@@ -13,6 +13,8 @@ import type {
 } from "@/lib/types";
 import { MiniGames } from "./PlayerBits";
 import { YahooEligibilityBox } from "./YahooPositionSheet";
+import { LuckPanel } from "./LuckPanel";
+import type { LuckReport } from "@/lib/luck";
 
 function Heatmap({
   weeks,
@@ -148,6 +150,8 @@ export function CandidatePanel({
   weeks,
   weekStartsOn,
   games,
+  luck,
+  luckLoading,
   onTogglePos,
   onEditYahoo,
   onAddToRoster,
@@ -159,6 +163,8 @@ export function CandidatePanel({
   weeks: WeekWindow[];
   weekStartsOn: 0 | 1;
   games: { date: string; opponent: string; home: boolean }[];
+  luck?: LuckReport | null;
+  luckLoading?: boolean;
   onTogglePos: (pos: FantasyPosition) => void;
   onEditYahoo: () => void;
   onAddToRoster: () => void;
@@ -233,6 +239,8 @@ export function CandidatePanel({
                 </div>
               </div>
             </div>
+
+            <LuckPanel lang={lang} report={luck} loading={luckLoading} />
 
             <WeekTable metrics={metrics} lang={lang} />
             <div className="flex flex-wrap gap-3 text-[11px] text-muted">
