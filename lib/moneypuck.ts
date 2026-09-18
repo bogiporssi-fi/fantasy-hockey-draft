@@ -8,6 +8,7 @@ import {
   type LuckPayload,
   type LuckReport,
   type SituationStats,
+  type TeamPpUsage,
   type YearSlice,
 } from "./luck";
 
@@ -19,6 +20,10 @@ export const MONEYPCK_GOALIES_CSV =
 
 export function skatersCsvUrl(season: number): string {
   return `https://moneypuck.com/moneypuck/playerData/seasonSummary/${season}/regular/skaters.csv`;
+}
+
+export function teamsCsvUrl(season: number): string {
+  return `https://moneypuck.com/moneypuck/playerData/seasonSummary/${season}/regular/teams.csv`;
 }
 
 type NamedYear = YearSlice & { playerId: number; name: string };
@@ -86,6 +91,12 @@ function situationFromRow(row: Record<string, string>): SituationStats {
     onIceShotsFor: num(row, "OnIce_F_shotsOnGoal"),
     onIceGoalsAgainst: num(row, "OnIce_A_goals"),
     onIceShotsAgainst: num(row, "OnIce_A_shotsOnGoal"),
+    primaryAssists: num(row, "I_F_primaryAssists"),
+    secondaryAssists: num(row, "I_F_secondaryAssists"),
+    ozStarts: num(row, "I_F_oZoneShiftStarts"),
+    dzStarts: num(row, "I_F_dZoneShiftStarts"),
+    xGoalsPct: num(row, "onIce_xGoalsPercentage"),
+    corsiPct: num(row, "onIce_corsiPercentage"),
   };
 }
 
@@ -106,6 +117,8 @@ export function parseSkaterSeasonCsv(text: string): NamedYear[] {
         season: yr,
       } satisfies NamedYear);
     if (row.name) cur.name = row.name;
+    const team = (row.team ?? "").trim();
+    if (team.length === 3) cur.team = team;
     const stats = situationFromRow(row);
     if (sit === "all") cur.all = stats;
     else if (sit === "5on5") cur.five = stats;
@@ -122,7 +135,33 @@ export function reportsFromSkaterCsv(text: string): LuckReport[] {
     .map((y) => assembleSkaterReport(y.playerId, y.name, [y]));
 }
 
-export function mergeSkaterYears(seasons: NamedYear[][]): LuckReport[] {
+export function parseTeamPpCsv(text: string): Map<string, TeamPpUsage> {
+  const out = new Map<string, TeamPpUsage>();
+  for (const row of parseCsv(text)) {
+    if ((row.situation ?? "") !== "5on4") continue;
+    const team = (row.team ?? row.name ?? "").trim();
+    const season = Number.parseInt(row.season ?? "", 10);
+    if (team.length !== 3 || !Number.isFinite(season)) continue;
+    const iceTime = num(row, "iceTime") || num(row, "icetime");
+    const games = num(row, "games_played");
+    if (!(iceTime > 0) || !(games > 0)) continue;
+    out.set(`${season}:${team}`, { iceTime, games });
+  }
+  return out;
+}
+
+export function mergeTeamPp(maps: Map<string, TeamPpUsage>[]): Map<string, TeamPpUsage> {
+  const out = new Map<string, TeamPpUsage>();
+  for (const m of maps) {
+    for (const [k, v] of m) out.set(k, v);
+  }
+  return out;
+}
+
+export function mergeSkaterYears(
+  seasons: NamedYear[][],
+  teamPp?: Map<string, TeamPpUsage>,
+): LuckReport[] {
   const byId = new Map<number, { name: string; years: YearSlice[] }>();
   for (const list of seasons) {
     for (const y of list) {
@@ -135,7 +174,7 @@ export function mergeSkaterYears(seasons: NamedYear[][]): LuckReport[] {
   const reports: LuckReport[] = [];
   for (const [id, g] of byId) {
     if (!g.years.some((y) => y.all || y.five)) continue;
-    reports.push(assembleSkaterReport(id, g.name, g.years));
+    reports.push(assembleSkaterReport(id, g.name, g.years, teamPp));
   }
   return reports;
 }
@@ -198,19 +237,20 @@ async function fetchCsv(url: string): Promise<string> {
 
 export async function loadLuckPayload(): Promise<LuckPayload> {
   const skaterUrls = LUCK_YEARS.map((y) => skatersCsvUrl(y));
+  const teamUrls = LUCK_YEARS.map((y) => teamsCsvUrl(y));
   const settled = await Promise.allSettled([
     fetchCsv(MONEYPCK_GOALIES_CSV),
     ...skaterUrls.map((url) => fetchCsv(url)),
+    ...teamUrls.map((url) => fetchCsv(url)),
   ]);
   const goalieCsv = settled[0].status === "fulfilled" ? settled[0].value : "";
-  const skaterCsvs = settled.slice(1).map((s) => (s.status === "fulfilled" ? s.value : ""));
+  const skaterCsvs = settled.slice(1, 1 + skaterUrls.length).map((s) => (s.status === "fulfilled" ? s.value : ""));
+  const teamCsvs = settled.slice(1 + skaterUrls.length).map((s) => (s.status === "fulfilled" ? s.value : ""));
   const parsedYears = skaterCsvs.filter(Boolean).map((text) => parseSkaterSeasonCsv(text));
-  const files = [
-    ...skaterUrls,
-    MONEYPCK_GOALIES_CSV,
-  ];
+  const teamPp = mergeTeamPp(teamCsvs.filter(Boolean).map((text) => parseTeamPpCsv(text)));
+  const files = [...skaterUrls, ...teamUrls, MONEYPCK_GOALIES_CSV];
   const reports = [
-    ...mergeSkaterYears(parsedYears),
+    ...mergeSkaterYears(parsedYears, teamPp),
     ...(goalieCsv ? reportsFromGoalieCsv(goalieCsv) : []),
   ];
   const players: Record<string, LuckReport> = {};
@@ -230,7 +270,7 @@ export async function loadLuckPayload(): Promise<LuckPayload> {
       name: "MoneyPuck",
       url: MONEYPCK_DATA_PAGE,
       files,
-      note: "Free for non-commercial use; credit MoneyPuck.com. Frozen Tools-style rates (5v5 SH%, IPP, PP-IPP) computed from these CSVs — not Dobber data.",
+      note: "Free for non-commercial use; credit MoneyPuck.com. Frozen Tools-style rates computed from these CSVs — not Dobber data.",
     },
     players,
   };

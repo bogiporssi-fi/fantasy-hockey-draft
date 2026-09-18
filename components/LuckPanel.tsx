@@ -107,10 +107,22 @@ export function LuckPanel({
             )
           </p>
         ) : (
-          <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-            <MiniMetric label={c.ftSh5} metric={report.sh5v5} pct />
-            <MiniMetric label={c.ftIpp} metric={report.ipp} pct />
-            <MiniMetric label={c.ftPpIpp} metric={report.ppIpp} pct />
+          <div className="mt-1.5 space-y-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
+              <MiniMetric label={c.ftSh5} metric={report.sh5v5} pct />
+              <MiniMetric label={c.ftIpp} metric={report.ipp} pct />
+              <MiniMetric label={c.ftPpIpp} metric={report.ppIpp} pct />
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <MiniMetric label={c.ftPpShare} metric={report.ppShare} pct />
+              <MiniMetric label={c.ftPts60} metric={report.ptsPer60} />
+              <MiniMetric label={c.ftSog60} metric={report.sogPer60} />
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <MiniMetric label={c.ftOz} metric={report.ozStart} pct />
+              <MiniMetric label={c.ftXg5} metric={report.xgPct5v5} pct />
+              <MiniMetric label={c.ftA2} metric={report.secondaryAssistPct} pct />
+            </div>
           </div>
         )}
       </div>
@@ -151,6 +163,14 @@ export function LuckPanel({
             <TrendStat label={c.ftSh5} metric={report.sh5v5} vs={c.ftVsPrior} pct />
             <TrendStat label={c.ftIpp} metric={report.ipp} vs={c.ftVsPrior} pct />
             <TrendStat label={c.ftPpIpp} metric={report.ppIpp} vs={c.ftVsPrior} pct />
+          </dl>
+          <dl className="mt-2 grid grid-cols-3 gap-2">
+            <TrendStat label={c.ftPpShare} metric={report.ppShare} vs={c.ftVsPrior} pct />
+            <TrendStat label={c.ftPts60} metric={report.ptsPer60} vs={c.ftVsPrior} />
+            <TrendStat label={c.ftSog60} metric={report.sogPer60} vs={c.ftVsPrior} />
+            <TrendStat label={c.ftOz} metric={report.ozStart} vs={c.ftVsPrior} pct />
+            <TrendStat label={c.ftXg5} metric={report.xgPct5v5} vs={c.ftVsPrior} pct />
+            <TrendStat label={c.ftA2} metric={report.secondaryAssistPct} vs={c.ftVsPrior} pct />
           </dl>
           <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
             <TrendStat label={c.ftIpp5} metric={report.ipp5v5} vs={c.ftVsPrior} pct />
@@ -199,13 +219,15 @@ function MiniMetric({
   pct?: boolean;
 }) {
   const show = pct ? fmtPct(metric.current) : fmt1(metric.current);
+  const deltaBits = [
+    metric.delta == null ? "Δ —" : `Δ ${fmtSigned(metric.delta)}`,
+    metric.delta2 != null ? `Δ2 ${fmtSigned(metric.delta2)}` : null,
+  ].filter(Boolean);
   return (
     <div>
       <div className="text-[10px] leading-tight text-muted">{label}</div>
       <div className="text-sm font-semibold tabular text-white">{show}</div>
-      <div className={`text-[10px] tabular ${deltaClass(metric.delta)}`}>
-        {metric.delta == null ? "Δ —" : `Δ ${fmtSigned(metric.delta)}`}
-      </div>
+      <div className={`text-[10px] tabular ${deltaClass(metric.delta)}`}>{deltaBits.join(" · ")}</div>
       {metric.trend.some((v) => v != null) && (
         <div className="text-[10px] tabular text-muted">{fmtTrend(metric.trend)}</div>
       )}

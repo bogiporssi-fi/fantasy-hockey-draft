@@ -50,6 +50,12 @@ export interface SituationStats {
   onIceShotsFor: number;
   onIceGoalsAgainst: number;
   onIceShotsAgainst: number;
+  primaryAssists: number;
+  secondaryAssists: number;
+  ozStarts: number;
+  dzStarts: number;
+  xGoalsPct: number;
+  corsiPct: number;
 }
 
 export interface SkaterLuckInput {
@@ -87,6 +93,55 @@ export interface TrendMetric {
 
 export const EMPTY_TREND: TrendMetric = { current: null, delta: null, delta2: null, trend: [] };
 
+export const PER60_MIN_ICE = 18000; // 300 minutes
+export const OZ_MIN_STARTS = 40;
+export const A2_MIN_ASSISTS = 8;
+export const PP_SHARE_MIN_ICE = 600; // 10 minutes of PP
+
+export function per60(count: number, iceTimeSeconds: number, minIce: number = PER60_MIN_ICE): number | null {
+  if (!(iceTimeSeconds >= minIce) || !Number.isFinite(count)) return null;
+  return round1((3600 * count) / iceTimeSeconds);
+}
+
+/** OZ Start% = offensive / (offensive + defensive) zone starts. */
+export function ozStartPct(ozStarts: number, dzStarts: number, minStarts: number = OZ_MIN_STARTS): number | null {
+  if (ozStarts + dzStarts < minStarts) return null;
+  return ratePct(ozStarts, ozStarts + dzStarts);
+}
+
+/** MoneyPuck stores on-ice xG% / CF% as 0–1. */
+export function shareToPct(raw: number): number | null {
+  if (!Number.isFinite(raw) || raw < 0) return null;
+  if (raw <= 1) return round1(raw * 100);
+  return round1(raw);
+}
+
+export function secondaryAssistPct(
+  primaryAssists: number,
+  secondaryAssists: number,
+  minAssists: number = A2_MIN_ASSISTS,
+): number | null {
+  const assists = primaryAssists + secondaryAssists;
+  if (assists < minAssists) return null;
+  return ratePct(secondaryAssists, assists);
+}
+
+/** GP-normalized share of team PP ice time. */
+export function ppSharePct(
+  playerPpIce: number,
+  playerGames: number,
+  teamPpIce: number,
+  teamGames: number,
+): number | null {
+  if (!(playerGames > 0) || !(teamGames > 0) || !(teamPpIce > 0) || playerPpIce < PP_SHARE_MIN_ICE) {
+    return null;
+  }
+  const playerPerG = playerPpIce / playerGames;
+  const teamPerG = teamPpIce / teamGames;
+  if (!(teamPerG > 0)) return null;
+  return round1((100 * playerPerG) / teamPerG);
+}
+
 export interface LuckReport {
   playerId: number;
   name: string;
@@ -109,6 +164,12 @@ export interface LuckReport {
   ipp: TrendMetric;
   ipp5v5: TrendMetric;
   ppIpp: TrendMetric;
+  ppShare: TrendMetric;
+  ptsPer60: TrendMetric;
+  sogPer60: TrendMetric;
+  ozStart: TrendMetric;
+  xgPct5v5: TrendMetric;
+  secondaryAssistPct: TrendMetric;
   onIceSh5v5: number | null;
   toi5v5: number | null;
   toiPp: number | null;
@@ -288,6 +349,12 @@ export function skaterReport(
     ipp: EMPTY_TREND,
     ipp5v5: EMPTY_TREND,
     ppIpp: EMPTY_TREND,
+    ppShare: EMPTY_TREND,
+    ptsPer60: EMPTY_TREND,
+    sogPer60: EMPTY_TREND,
+    ozStart: EMPTY_TREND,
+    xgPct5v5: EMPTY_TREND,
+    secondaryAssistPct: EMPTY_TREND,
     onIceSh5v5: null,
     toi5v5: null,
     toiPp: null,
@@ -296,9 +363,15 @@ export function skaterReport(
 
 export interface YearSlice {
   season: number;
+  team?: string;
   all?: SituationStats;
   five?: SituationStats;
   pp?: SituationStats;
+}
+
+export interface TeamPpUsage {
+  iceTime: number;
+  games: number;
 }
 
 function sliceIpp(s: SituationStats | undefined, minGoals: number): number | null {
@@ -311,7 +384,12 @@ function sliceSh(s: SituationStats | undefined, minShots: number): number | null
   return shootingPctMinShots(s.goals, s.shotsOnGoal, minShots);
 }
 
-export function assembleSkaterReport(playerId: number, name: string, years: YearSlice[]): LuckReport {
+export function assembleSkaterReport(
+  playerId: number,
+  name: string,
+  years: YearSlice[],
+  teamPp?: Map<string, TeamPpUsage>,
+): LuckReport {
   const byYear = new Map(years.map((y) => [y.season, y]));
   const latest =
     byYear.get(LUCK_SEASON) ??
@@ -352,6 +430,24 @@ export function assembleSkaterReport(playerId: number, name: string, years: Year
   const ippTrend = ordered.map((y) => sliceIpp(y?.all, IPP_MIN_ONICE_GOALS));
   const ipp5Trend = ordered.map((y) => sliceIpp(y?.five, IPP_MIN_ONICE_GOALS));
   const ppTrend = ordered.map((y) => sliceIpp(y?.pp, PP_IPP_MIN_ONICE_GOALS));
+  const ppShareTrend = ordered.map((y) => {
+    if (!y?.pp || !y.team || !teamPp) return null;
+    const team = teamPp.get(`${y.season}:${y.team}`);
+    if (!team) return null;
+    return ppSharePct(y.pp.iceTime, y.pp.gamesPlayed, team.iceTime, team.games);
+  });
+  const pts60Trend = ordered.map((y) => (y?.all ? per60(y.all.points, y.all.iceTime) : null));
+  const sog60Trend = ordered.map((y) => (y?.all ? per60(y.all.shotsOnGoal, y.all.iceTime) : null));
+  const ozTrend = ordered.map((y) => (y?.five ? ozStartPct(y.five.ozStarts, y.five.dzStarts) : null));
+  const xgTrend = ordered.map((y) => {
+    if (!y?.five || y.five.iceTime < PER60_MIN_ICE) return null;
+    if (y.five.xGoalsPct > 0) return shareToPct(y.five.xGoalsPct);
+    if (y.five.corsiPct > 0) return shareToPct(y.five.corsiPct);
+    return null;
+  });
+  const a2Trend = ordered.map((y) =>
+    y?.all ? secondaryAssistPct(y.all.primaryAssists, y.all.secondaryAssists) : null,
+  );
 
   return {
     ...base,
@@ -359,6 +455,12 @@ export function assembleSkaterReport(playerId: number, name: string, years: Year
     ipp: trendMetric([...ippTrend]),
     ipp5v5: trendMetric([...ipp5Trend]),
     ppIpp: trendMetric([...ppTrend]),
+    ppShare: trendMetric([...ppShareTrend]),
+    ptsPer60: trendMetric([...pts60Trend]),
+    sogPer60: trendMetric([...sog60Trend]),
+    ozStart: trendMetric([...ozTrend]),
+    xgPct5v5: trendMetric([...xgTrend]),
+    secondaryAssistPct: trendMetric([...a2Trend]),
     onIceSh5v5: five ? shootingPctMinShots(five.onIceGoalsFor, five.onIceShotsFor, SKATER_MIN_ONICE_SHOTS) : null,
     toi5v5: five ? toiPerGame(five.iceTime, five.gamesPlayed) : null,
     toiPp: pp ? toiPerGame(pp.iceTime, pp.gamesPlayed) : null,
@@ -391,6 +493,12 @@ export function goalieReport(playerId: number, name: string, input: GoalieLuckIn
     ipp: EMPTY_TREND,
     ipp5v5: EMPTY_TREND,
     ppIpp: EMPTY_TREND,
+    ppShare: EMPTY_TREND,
+    ptsPer60: EMPTY_TREND,
+    sogPer60: EMPTY_TREND,
+    ozStart: EMPTY_TREND,
+    xgPct5v5: EMPTY_TREND,
+    secondaryAssistPct: EMPTY_TREND,
     onIceSh5v5: null,
     toi5v5: null,
     toiPp: null,

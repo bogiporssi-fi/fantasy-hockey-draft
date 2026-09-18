@@ -25,7 +25,7 @@ Numbered in the Finnish UI (always visible):
 1. **Kokoonpano** — search a player you already drafted, or paste a list.
 2. **Yahoo-paikat** — mark C/LW/RW/D/G as in Yahoo. NHL primary is only a default.
 3. **Vertailu** — add candidates you are considering (several at once).
-4. **Hyöty / Penkki** — useful nights vs forced-bench nights vs the current roster. **Tyhjennä** clears the tray. Tap a card for the week calendar (on a phone this opens below Vertailu). **Frozen Tools -tyyliset mittarit** (5v5 SH%, IPP, PP-IPP + Δ vs prior seasons) sit under those schedule numbers and do not replace them.
+4. **Hyöty / Penkki** — useful nights vs forced-bench nights vs the current roster. **Tyhjennä** clears the tray. Tap a card for the week calendar (on a phone this opens below Vertailu). **Frozen Tools -tyyliset mittarit** (5v5 SH%, IPP, PP-IPP, %PP, PTS/60, SOG/60, OZ Start%, xG% 5v5, A2% + Δ vs prior seasons) sit under those schedule numbers and do not replace them.
 
 Default slots (Settings → named kimppa profiles): 2 C, 2 LW, 2 RW, 4 D, 2 G, bench 4, UTIL 0. H2H week start Monday (or Sunday).
 
@@ -70,10 +70,11 @@ Hypothesis check (in `lib/overlap.test.ts`): with two Toronto centers already ro
 - Season bounds: `GET https://api-web.nhle.com/v1/schedule/now`
 - Last-season **Frozen Tools-style** skater rates + luck: MoneyPuck free season CSVs for **2022–23, 2023–24, 2024–25**, cached at `GET /api/luck` for 7 days
   - Skaters: `https://moneypuck.com/moneypuck/playerData/seasonSummary/{2022,2023,2024}/regular/skaters.csv`
+  - Teams (PP ice for %PP): `https://moneypuck.com/moneypuck/playerData/seasonSummary/{2022,2023,2024}/regular/teams.csv`
   - Goalies: `https://moneypuck.com/moneypuck/playerData/seasonSummary/2024/regular/goalies.csv`
   - Data page / credit: [MoneyPuck.com data](https://moneypuck.com/data.htm) (free for non-commercial use)
   - Mapping: MoneyPuck `playerId` is the NHL id; unique-name fallback if needed
-  - **Not Dobber data.** Frozen Tools is a DobberHockey product (report UI / paid DFS). This app does not scrape Frozen Tools. It computes the same *decision signals* (5v5 SH%, IPP, PP-IPP, PDO, G vs xG, TOI) from MoneyPuck and labels them **Frozen Tools -tyyliset mittarit**.
+  - **Not Dobber data.** Frozen Tools is a DobberHockey product (report UI / paid DFS). This app does not scrape Frozen Tools. It computes the same *decision signals* (5v5 SH%, IPP, PP-IPP, %PP, PTS/60, SOG/60, OZ Start%, xG% 5v5, A2%, PDO, G vs xG, TOI) from MoneyPuck and labels them **Frozen Tools -tyyliset mittarit**.
 
 No invented games. If the API is missing a team, the footer/status line lists it.
 
@@ -83,6 +84,11 @@ On a Vertailu candidate (and the focused calendar), Luistin shows compact **Froz
 
 - **5v5 SH%** — even-strength shooting % (MoneyPuck `5on5` goals / shots), with a 22–23 → 23–24 → 24–25 trend.
 - **IPP** — individual points % = player points / on-ice goals (all situations). **IPP 5v5** is the even-strength version; **PP-IPP** uses `5on4`.
+- **%PP** — GP-normalized share of team 5-on-4 ice (`skaters.csv` `5on4` icetime / `teams.csv` `5on4` iceTime).
+- **PTS/60** and **SOG/60** — all-situations rates (`I_F_points`, `I_F_shotsOnGoal` / `icetime`).
+- **OZ Start%** — 5v5 offensive / (offensive + defensive) zone starts (`I_F_oZoneShiftStarts`, `I_F_dZoneShiftStarts`).
+- **xG% 5v5** — on-ice expected-goals share (`onIce_xGoalsPercentage`; CF% `onIce_corsiPercentage` if xG% is missing).
+- **A2%** — secondary assists / (primary + secondary) (`I_F_secondaryAssists`, `I_F_primaryAssists`).
 - **PDO 5v5**, **maalit vs xG**, **on-ice SH%**, **TOI 5v5 / PP-TOI**.
 - Short Finnish luck verdict when finishing/PDO supports it: *todennäköisesti onnekas / epäonnekas / neutraali*.
 
