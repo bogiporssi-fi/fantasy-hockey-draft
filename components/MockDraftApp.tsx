@@ -83,8 +83,10 @@ function useStableListScroll(itemKey: string, follow: "bottom" | "anchor") {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (follow === "bottom" && stickToBottomRef.current) {
-      el.scrollTop = el.scrollHeight;
+    if (follow === "bottom") {
+      if (stickToBottomRef.current) {
+        el.scrollTop = el.scrollHeight;
+      }
       return;
     }
     const anchor = anchorRef.current;
@@ -352,7 +354,6 @@ export function MockDraftApp() {
     });
   }, [liveRemaining, query, posFilter, sortKey]);
 
-  const recentPicks = useMemo(() => livePicks.slice(-10), [livePicks]);
   const teamViews = useMemo(
     () => rosterByTeamViews(livePicks, userIndex),
     [livePicks, userIndex],
@@ -620,7 +621,7 @@ export function MockDraftApp() {
             <>
               <LastTen
                 lang={lang}
-                picks={recentPicks}
+                picks={livePicks}
                 userIndex={userIndex}
                 open={lastTenOpen}
                 onToggle={() => setLastTenOpen((v) => !v)}
