@@ -264,6 +264,7 @@ const fi = {
   mockOpenSearch: "Haku",
   mockOpenFilters: "Suodattimet",
   mockFilledOf: "{n}/{total}",
+  mockConfirmPlayer: "Vahvista {name}",
 };
 
 const en: typeof fi = {
@@ -530,6 +531,7 @@ const en: typeof fi = {
   mockOpenSearch: "Search",
   mockOpenFilters: "Filters",
   mockFilledOf: "{n}/{total}",
+  mockConfirmPlayer: "Confirm {name}",
 };
 
 export const copy = { fi, en };
