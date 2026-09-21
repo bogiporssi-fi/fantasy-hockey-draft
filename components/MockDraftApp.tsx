@@ -19,6 +19,7 @@ import {
   MOCK_TOTAL_PICKS,
   pickIndexForTeamRound,
   picksUntilTurn,
+  playerListTap,
   remainingFromPicks,
   remainingSlots,
   rosterByTeamViews,
@@ -1202,15 +1203,40 @@ function PlayersTab({
   onToggleQueue: (id: string) => void;
 }) {
   const c = t(lang);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  if (!isUserTurn && selectedId != null) {
+    setSelectedId(null);
+  }
   const listKey = `${players.length}:${players[0]?.id ?? ""}:${players.at(-1)?.id ?? ""}`;
   const { ref: scrollerRef, onScroll } = useStableListScroll(listKey, "anchor");
+  const selectedPlayer = isUserTurn ? (players.find((p) => p.id === selectedId) ?? null) : null;
+
   useLayoutEffect(() => {
     const el = scrollerRef.current;
     if (el) el.scrollTop = 0;
   }, [query, posFilter, sortKey, scrollerRef]);
 
+  function tapAvailablePlayer(p: MockPlayer, fits: boolean) {
+    if (!isUserTurn || !fits) return;
+    const next = playerListTap(selectedId, p.id);
+    if (next.confirm) {
+      setSelectedId(null);
+      onPick(p);
+      return;
+    }
+    setSelectedId(next.selectedId);
+  }
+
+  function confirmSelected() {
+    if (!selectedPlayer || !isUserTurn) return;
+    const fits = assignSlot(selectedPlayer.positions, remainingSlotsNow) !== null;
+    if (!fits) return;
+    setSelectedId(null);
+    onPick(selectedPlayer);
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="relative flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-2 px-3 py-1">
         <IconButton
           label={c.mockOpenSearch}
@@ -1293,7 +1319,9 @@ function PlayersTab({
       <ul
         ref={scrollerRef}
         onScroll={onScroll}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white pb-28 [overflow-anchor:none]"
+        className={`min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white [overflow-anchor:none] ${
+          selectedPlayer && isUserTurn ? "pb-40" : "pb-28"
+        }`}
       >
         {players.length === 0 && (
           <li className="px-4 py-6 text-sm text-zinc-500">{c.mockEmptyList}</li>
@@ -1301,6 +1329,13 @@ function PlayersTab({
         {players.map((p, i) => {
           const fits = assignSlot(p.positions, remainingSlotsNow) !== null;
           const queued = queueIds.includes(p.id);
+          const selected = selectedId === p.id;
+          const canPick = isUserTurn && fits;
+          const pickLabel = selected
+            ? c.mockConfirmPlayer.replace("{name}", p.name)
+            : canPick
+              ? `${c.mockPickPlayer} ${p.name}`
+              : p.name;
           return (
             <li key={p.id} data-scroll-anchor={p.id}>
               {untilTurn > 0 && i === untilTurn && (
@@ -1310,7 +1345,13 @@ function PlayersTab({
                   </span>
                 </div>
               )}
-              <div className="grid grid-cols-[1fr_3.25rem_3.25rem] items-center gap-1 border-b border-zinc-100 px-2 py-2">
+              <div
+                className={`grid grid-cols-[1fr_3.25rem_3.25rem] items-center gap-1 border-b px-2 py-2 ${
+                  selected
+                    ? "border-[var(--mock-purple)] bg-[var(--mock-purple-soft)] ring-2 ring-inset ring-[var(--mock-purple)]"
+                    : "border-zinc-100"
+                }`}
+              >
                 <div className="flex min-w-0 items-center gap-2">
                   <button
                     type="button"
@@ -1324,13 +1365,19 @@ function PlayersTab({
                   <button
                     type="button"
                     disabled={isUserTurn && !fits}
-                    aria-label={isUserTurn && fits ? `${c.mockPickPlayer} ${p.name}` : p.name}
-                    onClick={() => {
-                      if (isUserTurn && fits) onPick(p);
-                    }}
+                    aria-label={pickLabel}
+                    aria-pressed={canPick ? selected : undefined}
+                    onClick={() => tapAvailablePlayer(p, fits)}
                     className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:opacity-50"
                   >
-                    <Headshot player={p} size={36} />
+                    <span className="relative shrink-0">
+                      <Headshot player={p} size={36} />
+                      {selected && (
+                        <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--mock-purple)] text-white">
+                          <IconCheck />
+                        </span>
+                      )}
+                    </span>
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-bold text-zinc-900">
                         {formatShortName(p)}
@@ -1353,6 +1400,19 @@ function PlayersTab({
           );
         })}
       </ul>
+      {selectedPlayer && isUserTurn && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-[3.25rem] z-20 px-3">
+          <button
+            type="button"
+            onClick={confirmSelected}
+            className="pointer-events-auto flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--mock-purple)] px-4 text-sm font-semibold text-white shadow-lg"
+            aria-label={c.mockConfirmPlayer.replace("{name}", selectedPlayer.name)}
+          >
+            <IconCheck />
+            {c.mockPickPlayer} · {formatShortName(selectedPlayer)}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -2009,6 +2069,20 @@ function IconClock() {
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
       <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
       <path d="M12 8v5l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M6 12.5l4 4 8-9"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

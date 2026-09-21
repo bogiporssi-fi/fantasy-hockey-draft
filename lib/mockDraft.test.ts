@@ -22,6 +22,7 @@ import {
   needAwareCandidates,
   pickIndexForTeamRound,
   picksUntilTurn,
+  playerListTap,
   remainingSlots,
   rosterRespectsLimits,
   rosterByTeamViews,
@@ -435,5 +436,14 @@ describe("yahoo rank sort", () => {
     expect(sortPlayers(pool, "yahooRank").map((p) => p.id)).toEqual(["a", "d", "b", "c"]);
     expect(compareYahooRank(pool[2], pool[0])).toBeGreaterThan(0);
     expect(compareAdp(pool[3], pool[0])).toBeGreaterThan(0);
+  });
+});
+
+describe("player list two-tap pick", () => {
+  it("selects on the first tap and confirms only on a second tap of the same player", () => {
+    expect(playerListTap(null, "a")).toEqual({ selectedId: "a", confirm: false });
+    expect(playerListTap("a", "a")).toEqual({ selectedId: "a", confirm: true });
+    expect(playerListTap("a", "b")).toEqual({ selectedId: "b", confirm: false });
+    expect(playerListTap("b", "a")).toEqual({ selectedId: "a", confirm: false });
   });
 });

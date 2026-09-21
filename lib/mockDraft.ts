@@ -282,6 +282,17 @@ export function formatLastPickTicker(
   return `${formatShortName(player)} (${formatPosTeam(player)})`;
 }
 
+/**
+ * Available-player list: first tap selects, second tap on the same player confirms
+ * the pick. Tapping a different player only switches the highlight.
+ */
+export function playerListTap(
+  selectedId: string | null,
+  tappedId: string,
+): { selectedId: string; confirm: boolean } {
+  return { selectedId: tappedId, confirm: selectedId === tappedId };
+}
+
 /** Picks until this seat is on the clock (0 = now). -1 if the seat is unknown. */
 export function picksUntilTurn(
   pickIndex: number,
