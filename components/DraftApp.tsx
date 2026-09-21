@@ -1,5 +1,6 @@
 "use client";
 
+import { AppNav, LuistinLogo } from "@/components/AppNav";
 import { CandidatePanel } from "@/components/CandidatePanel";
 import { CompareTray } from "@/components/CompareTray";
 import { DraftSteps } from "@/components/DraftSteps";
@@ -304,7 +305,7 @@ export function DraftApp() {
     <div className="mx-auto flex min-h-screen w-full max-w-[1400px] flex-col px-3 py-3 sm:px-5 sm:py-4">
       <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
-          <Logo />
+          <LuistinLogo />
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-white">{c.appTitle}</h1>
             <p className="text-xs text-muted">
@@ -314,6 +315,7 @@ export function DraftApp() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <AppNav lang={lang} active="helper" />
           <select
             className="rounded-lg border border-line bg-[#08141d] px-2 py-1.5 text-sm text-muted"
             value={profile.id}
@@ -557,22 +559,5 @@ export function DraftApp() {
         />
       )}
     </div>
-  );
-}
-
-function Logo() {
-  return (
-    <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden className="shrink-0">
-      <rect x="1" y="1" width="34" height="34" rx="10" fill="#0c1a24" stroke="#2a6f6a" />
-      <path
-        d="M8 22c6-1 10-8 14-8 2 0 3 1 6 1"
-        fill="none"
-        stroke="#8ef0e6"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path d="M10 24h12" stroke="#8ef0e6" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="24" cy="14" r="2" fill="#8ef0e6" />
-    </svg>
   );
 }

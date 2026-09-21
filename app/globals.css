@@ -22,6 +22,7 @@
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

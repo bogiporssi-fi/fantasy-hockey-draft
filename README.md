@@ -14,7 +14,7 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000). First load fetches the current NHL regular-season schedule and club rosters from the public NHL Web API (`api-web.nhle.com`). That can take a few seconds, then it is cached on the server.
 
 ```bash
-npm test    # overlap scoring, name matching, luck classification
+npm test    # overlap scoring, name matching, luck classification, mock snake/bot
 npm run lint
 ```
 
@@ -32,6 +32,10 @@ Default slots (Settings → named kimppa profiles): 2 C, 2 LW, 2 RW, 4 D, 2 G, b
 If you draft them, **Lisää kokoonpanoon** copies those Yahoo positions onto the roster.
 
 No Yahoo OAuth, no passwords. Category scoring projections are out of scope — schedule and slot utilization only.
+
+## Mock draft (`/mock`)
+
+Separate 20-team Yahoo **snake mock** (not the overlap helper). Solo + 19 ADP-aware bots. Player pool and `average_pick` come from Yahoo’s public fantasy endpoint (NHL `game_key` verified at runtime, currently `477`) — no OAuth. Cached about a day; Finnish error if Yahoo is down.
 
 ### Paste / CSV (no Yahoo login)
 
