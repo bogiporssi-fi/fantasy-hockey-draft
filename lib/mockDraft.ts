@@ -184,12 +184,14 @@ export function playerFitsRoster(
 }
 
 export function compareAdp(a: MockPlayer, b: MockPlayer): number {
-  const aMissing = a.adp == null || !Number.isFinite(a.adp);
-  const bMissing = b.adp == null || !Number.isFinite(b.adp);
-  if (aMissing && bMissing) return a.name.localeCompare(b.name);
-  if (aMissing) return 1;
-  if (bMissing) return -1;
-  if (a.adp !== b.adp) return a.adp - b.adp;
+  const aAdp = a.adp;
+  const bAdp = b.adp;
+  if (aAdp == null || !Number.isFinite(aAdp)) {
+    if (bAdp == null || !Number.isFinite(bAdp)) return a.name.localeCompare(b.name);
+    return 1;
+  }
+  if (bAdp == null || !Number.isFinite(bAdp)) return -1;
+  if (aAdp !== bAdp) return aAdp - bAdp;
   return a.name.localeCompare(b.name);
 }
 
