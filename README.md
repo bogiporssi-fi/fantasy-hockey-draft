@@ -14,7 +14,7 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000). First load fetches the current NHL regular-season schedule and club rosters from the public NHL Web API (`api-web.nhle.com`). That can take a few seconds, then it is cached on the server.
 
 ```bash
-npm test    # overlap scoring, name matching, luck classification, mock snake/bot
+npm test    # overlap scoring, name matching, luck classification, mock snake/bot, Yahoo OR rank, last-10, rooms
 npm run lint
 ```
 
@@ -35,7 +35,22 @@ No Yahoo OAuth, no passwords. Category scoring projections are out of scope — 
 
 ## Mock draft (`/mock`)
 
-Separate 20-team Yahoo **snake mock** (not the overlap helper). Solo + 19 ADP-aware bots. Player pool and `average_pick` come from Yahoo’s public fantasy endpoint (NHL `game_key` verified at runtime, currently `477`) — no OAuth. Cached about a day; Finnish error if Yahoo is down.
+Separate 20-team Yahoo **snake mock** (not the overlap helper). Solo + 19 ADP-aware bots, or a **shared room** so other humans can claim empty seats. Player pool, `average_pick` (ADP) and overall rank (`player_ranks` where `rank_type === "OR"`, shown as **YR**) come from Yahoo’s public fantasy endpoint (`out=draft_analysis,ranks`; NHL `game_key` verified at runtime, currently `477`) — no OAuth. Cached about a day; Finnish error if Yahoo is down.
+
+During a mock: **Draft** tab has the board, available players (sort ADP or Yahoo-rank), and the last 10 picks. **Joukkueet** shows each of the 20 teams’ drafted players.
+
+### Multiplayer rooms
+
+Host picks a slot → **Luo jaettu huone** → share `/mock?room=XXXXXX`. Others open the link, tap an empty seat (**Liity**). Host **Aloita mock**; empty seats become bots. Seats lock after start. Clients poll `GET /api/mock/room/[id]` every ~1.5s.
+
+Room JSON lives in **Upstash Redis** when env vars are set (Vercel KV / Upstash Marketplace). Otherwise it stays in the Node process (two local browsers on `next dev` work; Vercel serverless needs Redis).
+
+Production env (either pair):
+
+- `KV_REST_API_URL` + `KV_REST_API_TOKEN` (Vercel KV / Upstash on Marketplace)
+- or `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`
+
+Rooms expire after 6 hours. Solo mock and the draft helper do not need these vars.
 
 ### Paste / CSV (no Yahoo login)
 
@@ -118,4 +133,4 @@ This repo is not linked to a Vercel project from CI. One-click on the **bogipors
 
 CLI (if you have a token): `npm i -g vercel && vercel login && vercel --prod --yes`
 
-No env vars are required.
+No env vars are required for the draft helper or a **solo** mock. Shared mock rooms on Vercel need Upstash Redis / Vercel KV (`KV_REST_API_URL` + `KV_REST_API_TOKEN`, or `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`).

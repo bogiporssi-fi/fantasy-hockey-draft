@@ -5,6 +5,7 @@ import {
   loadYahooPlayers,
   parseAveragePick,
   parseEligiblePositions,
+  parseOverallRank,
   parseYahooPlayersPage,
   YAHOO_MIN_POOL,
 } from "./yahooPlayers";
@@ -40,6 +41,12 @@ const samplePage = {
               {
                 draft_analysis: [{ average_pick: "1.5" }, { average_round: "1.0" }],
               },
+              {
+                player_ranks: [
+                  { player_rank: { rank_type: "OR", rank_value: "1" } },
+                  { player_rank: { rank_type: "S", rank_value: "1", rank_season: "2026" } },
+                ],
+              },
             ],
           },
           "1": {
@@ -52,6 +59,9 @@ const samplePage = {
                 { eligible_positions: [{ position: "RW" }] },
               ],
               { draft_analysis: [{ average_pick: "3.8" }] },
+              {
+                player_ranks: [{ player_rank: { rank_type: "S", rank_value: "2", rank_season: "2026" } }],
+              },
             ],
           },
           "2": {
@@ -94,11 +104,13 @@ describe("Yahoo player JSON parsing", () => {
       team: "EDM",
       positions: ["C"],
       adp: 1.5,
+      yahooRank: 1,
     });
     expect(players[1]).toMatchObject({
       name: "Nikita Kucherov",
       positions: ["RW"],
       adp: 3.8,
+      yahooRank: null,
     });
     expect(players[2]).toMatchObject({
       name: "Leon Draisaitl",
@@ -113,6 +125,19 @@ describe("Yahoo player JSON parsing", () => {
     expect(parseAveragePick([{ average_pick: "-" }])).toBeNull();
     expect(parseAveragePick([{ average_pick: "0" }])).toBeNull();
     expect(parseAveragePick([{ percent_drafted: "1.00" }])).toBeNull();
+  });
+
+  it("reads Yahoo overall rank (OR) and ignores other rank_type values", () => {
+    expect(
+      parseOverallRank([
+        { player_rank: { rank_type: "OR", rank_value: "1" } },
+        { player_rank: { rank_type: "S", rank_value: "4" } },
+      ]),
+    ).toBe(1);
+    expect(parseOverallRank([{ rank_type: "OR", rank_value: "12" }])).toBe(12);
+    expect(parseOverallRank([{ player_rank: { rank_type: "S", rank_value: "1" } }])).toBeNull();
+    expect(parseOverallRank([{ player_rank: { rank_type: "OR", rank_value: "-" } }])).toBeNull();
+    expect(parseOverallRank([])).toBeNull();
   });
 });
 
@@ -142,7 +167,11 @@ describe("loadYahooPlayers pagination", () => {
             }),
           };
         }
-        const match = String(url).match(/start=(\d+)/);
+        const href = String(url);
+        if (href.includes("/players")) {
+          expect(href).toContain("out=draft_analysis,ranks");
+        }
+        const match = href.match(/start=(\d+)/);
         const start = Number(match?.[1] ?? 0);
         if (start >= YAHOO_MIN_POOL) {
           return {

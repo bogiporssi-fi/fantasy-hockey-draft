@@ -6,7 +6,9 @@ import {
   buildSnakeOrder,
   chooseBotPick,
   compareAdp,
+  compareYahooRank,
   createEmptyRosters,
+  lastNPicks,
   MOCK_ROUNDS,
   MOCK_SLOT_LIMITS,
   MOCK_TEAM_COUNT,
@@ -15,13 +17,16 @@ import {
   pickIndexForTeamRound,
   remainingSlots,
   rosterRespectsLimits,
+  rosterByTeamViews,
   roundOfPick,
   simulateMockDraft,
   snakeDraftSlot,
   snakeTeamIndex,
   sortByAdp,
+  sortPlayers,
   starterSlotFor,
   weightedIndex,
+  type MockDraftPickRecord,
   type MockPlayer,
   type MockSlotCounts,
 } from "./mockDraft";
@@ -31,6 +36,7 @@ function player(
   name: string,
   positions: FantasyPosition[],
   adp: number | null,
+  yahooRank: number | null = adp,
 ): MockPlayer {
   const [first, ...rest] = name.split(" ");
   return {
@@ -42,6 +48,7 @@ function player(
     displayPosition: positions.join(","),
     positions,
     adp,
+    yahooRank,
   };
 }
 
@@ -250,5 +257,89 @@ describe("full 20-team snake mock", () => {
     expect(humanPicks.every((p) => p.teamIndex === 6)).toBe(true);
     expect(humanIds).toHaveLength(16);
     expect(rosterRespectsLimits(rosters[6])).toBe(true);
+  });
+});
+
+describe("last 10 picks", () => {
+  function rec(pickIndex: number, teamIndex: number, name: string): MockDraftPickRecord {
+    return {
+      pickIndex,
+      teamIndex,
+      player: player(String(pickIndex), name, ["C"], pickIndex + 1),
+      slot: "C",
+      by: "bot",
+    };
+  }
+
+  it("returns the most recent picks first and caps at 10", () => {
+    const picks = Array.from({ length: 12 }, (_, i) => rec(i, i % 20, `P${i}`));
+    const last = lastNPicks(picks, 10);
+    expect(last).toHaveLength(10);
+    expect(last.map((p) => p.pickIndex)).toEqual([11, 10, 9, 8, 7, 6, 5, 4, 3, 2]);
+    expect(lastNPicks(picks.slice(0, 3), 10).map((p) => p.pickIndex)).toEqual([2, 1, 0]);
+    expect(lastNPicks([], 10)).toEqual([]);
+    expect(lastNPicks(picks, 0)).toEqual([]);
+  });
+
+  it("skips holes in a sparse board", () => {
+    const board = Array.from({ length: 40 }, () => null as MockDraftPickRecord | null);
+    board[0] = rec(0, 0, "A");
+    board[5] = rec(5, 5, "B");
+    expect(lastNPicks(board, 10).map((p) => p.player.name)).toEqual(["B", "A"]);
+  });
+});
+
+describe("roster-by-team view model", () => {
+  it("shows all 20 seats and highlights the user's team", () => {
+    const picks: MockDraftPickRecord[] = [
+      {
+        pickIndex: 0,
+        teamIndex: 0,
+        player: player("1", "Connor McDavid", ["C"], 1.5, 1),
+        slot: "C",
+        by: "human",
+      },
+      {
+        pickIndex: 1,
+        teamIndex: 1,
+        player: player("2", "Cale Makar", ["D"], 6, 5),
+        slot: "D",
+        by: "bot",
+      },
+      {
+        pickIndex: 39,
+        teamIndex: 0,
+        player: player("3", "Leon Draisaitl", ["C", "LW"], 5, 3),
+        slot: "LW",
+        by: "human",
+      },
+    ];
+    const views = rosterByTeamViews(picks, 0);
+    expect(views).toHaveLength(20);
+    expect(views[0].isUser).toBe(true);
+    expect(views[0].seat).toBe(1);
+    expect(views[0].picks.map((p) => p.player.name)).toEqual(["Connor McDavid", "Leon Draisaitl"]);
+    expect(views[0].filled.C).toBe(1);
+    expect(views[0].filled.LW).toBe(1);
+    expect(views[1].isUser).toBe(false);
+    expect(views[1].picks).toHaveLength(1);
+    expect(views[2].picks).toHaveLength(0);
+    expect(rosterByTeamViews(picks, null).every((v) => v.isUser === false)).toBe(true);
+  });
+});
+
+describe("yahoo rank sort", () => {
+  it("defaults to ADP, sorts by Yahoo-rank independently, and puts missing values last", () => {
+    const pool = [
+      player("a", "High Adp Low Rank", ["C"], 20, 2),
+      player("b", "Low Adp High Rank", ["C"], 1.5, 10),
+      player("c", "No Rank", ["C"], 3, null),
+      player("d", "No Adp", ["C"], null, 4),
+    ];
+    expect(sortPlayers(pool).map((p) => p.id)).toEqual(["b", "c", "a", "d"]);
+    expect(sortPlayers(pool, "adp").map((p) => p.id)).toEqual(["b", "c", "a", "d"]);
+    expect(sortPlayers(pool, "yahooRank").map((p) => p.id)).toEqual(["a", "d", "b", "c"]);
+    expect(compareYahooRank(pool[2], pool[0])).toBeGreaterThan(0);
+    expect(compareAdp(pool[3], pool[0])).toBeGreaterThan(0);
   });
 });

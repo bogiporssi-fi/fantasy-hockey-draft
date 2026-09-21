@@ -35,8 +35,11 @@ export interface MockPlayer {
   displayPosition: string;
   positions: FantasyPosition[];
   adp: number | null;
+  yahooRank: number | null;
   headshot?: string | null;
 }
+
+export type MockSortKey = "adp" | "yahooRank";
 
 export interface RosterPick {
   playerId: string;
@@ -183,20 +186,114 @@ export function playerFitsRoster(
   return assignSlot(positions, remaining) !== null;
 }
 
-export function compareAdp(a: MockPlayer, b: MockPlayer): number {
-  const aAdp = a.adp;
-  const bAdp = b.adp;
-  if (aAdp == null || !Number.isFinite(aAdp)) {
-    if (bAdp == null || !Number.isFinite(bAdp)) return a.name.localeCompare(b.name);
+function compareNullableAsc(
+  aVal: number | null,
+  bVal: number | null,
+  aName: string,
+  bName: string,
+): number {
+  const aOk = aVal != null && Number.isFinite(aVal);
+  const bOk = bVal != null && Number.isFinite(bVal);
+  if (!aOk) {
+    if (!bOk) return aName.localeCompare(bName);
     return 1;
   }
-  if (bAdp == null || !Number.isFinite(bAdp)) return -1;
-  if (aAdp !== bAdp) return aAdp - bAdp;
-  return a.name.localeCompare(b.name);
+  if (!bOk) return -1;
+  if (aVal !== bVal) return (aVal as number) - (bVal as number);
+  return aName.localeCompare(bName);
+}
+
+export function compareAdp(a: MockPlayer, b: MockPlayer): number {
+  return compareNullableAsc(a.adp, b.adp, a.name, b.name);
+}
+
+export function compareYahooRank(a: MockPlayer, b: MockPlayer): number {
+  return compareNullableAsc(a.yahooRank, b.yahooRank, a.name, b.name);
 }
 
 export function sortByAdp(players: MockPlayer[]): MockPlayer[] {
   return [...players].sort(compareAdp);
+}
+
+export function sortPlayers(players: MockPlayer[], key: MockSortKey = "adp"): MockPlayer[] {
+  return [...players].sort(key === "yahooRank" ? compareYahooRank : compareAdp);
+}
+
+/** Most recent first. Accepts a compact pick list or a sparse board. */
+export function lastNPicks(
+  picks: Array<MockDraftPickRecord | null | undefined>,
+  n = 10,
+): MockDraftPickRecord[] {
+  if (n <= 0) return [];
+  const filled = picks.filter((p): p is MockDraftPickRecord => Boolean(p));
+  return filled.slice(-n).reverse();
+}
+
+export interface TeamRosterView {
+  teamIndex: number;
+  seat: number;
+  isUser: boolean;
+  picks: MockDraftPickRecord[];
+  filled: MockSlotCounts;
+}
+
+/** One row per seat (1–20) with that team's drafted players. */
+export function rosterByTeamViews(
+  picks: MockDraftPickRecord[],
+  userTeamIndex: number | null,
+  teamCount: number = MOCK_TEAM_COUNT,
+): TeamRosterView[] {
+  const grouped: MockDraftPickRecord[][] = Array.from({ length: teamCount }, () => []);
+  for (const pick of picks) {
+    if (pick.teamIndex < 0 || pick.teamIndex >= teamCount) continue;
+    grouped[pick.teamIndex].push(pick);
+  }
+  return grouped.map((teamPicks, teamIndex) => ({
+    teamIndex,
+    seat: teamIndex + 1,
+    isUser: userTeamIndex === teamIndex,
+    picks: teamPicks,
+    filled: teamPicks.reduce((acc, p) => {
+      acc[p.slot] += 1;
+      return acc;
+    }, emptySlotCounts()),
+  }));
+}
+
+export function rostersFromPicks(
+  picks: MockDraftPickRecord[],
+  teamCount: number = MOCK_TEAM_COUNT,
+): TeamRoster[] {
+  const rosters = createEmptyRosters(teamCount);
+  for (const pick of picks) {
+    if (pick.teamIndex < 0 || pick.teamIndex >= teamCount) continue;
+    const roster = rosters[pick.teamIndex];
+    rosters[pick.teamIndex] = {
+      ...roster,
+      picks: [
+        ...roster.picks,
+        { playerId: pick.player.id, slot: pick.slot, pickIndex: pick.pickIndex },
+      ],
+      filled: { ...roster.filled, [pick.slot]: roster.filled[pick.slot] + 1 },
+    };
+  }
+  return rosters;
+}
+
+export function sparseBoard(
+  picks: MockDraftPickRecord[],
+  total: number = MOCK_TOTAL_PICKS,
+): (MockDraftPickRecord | null)[] {
+  const board = Array.from({ length: total }, () => null as MockDraftPickRecord | null);
+  for (const pick of picks) {
+    if (pick.pickIndex >= 0 && pick.pickIndex < total) board[pick.pickIndex] = pick;
+  }
+  return board;
+}
+
+export function remainingFromPicks(pool: MockPlayer[], picks: MockDraftPickRecord[]): MockPlayer[] {
+  const taken = new Set(picks.map((p) => p.player.id));
+  return pool.filter((p) => !taken.has(p.id));
 }
 
 /** ADP-sorted players that fill an open starter, else BN-eligible players. */
