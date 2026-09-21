@@ -8,6 +8,7 @@ import {
   compareAdp,
   compareYahooRank,
   createEmptyRosters,
+  formatDraftedLabel,
   lastNPicks,
   MOCK_ROUNDS,
   MOCK_SLOT_LIMITS,
@@ -341,5 +342,32 @@ describe("yahoo rank sort", () => {
     expect(sortPlayers(pool, "yahooRank").map((p) => p.id)).toEqual(["a", "d", "b", "c"]);
     expect(compareYahooRank(pool[2], pool[0])).toBeGreaterThan(0);
     expect(compareAdp(pool[3], pool[0])).toBeGreaterThan(0);
+  });
+});
+
+describe("own-roster drafted label", () => {
+  it("joins full name, NHL team abbr, and Yahoo eligible positions", () => {
+    expect(
+      formatDraftedLabel({
+        name: "Elias Pettersson",
+        team: "VAN",
+        positions: ["C", "LW"],
+      }),
+    ).toBe("Elias Pettersson, VAN, C/LW");
+    expect(
+      formatDraftedLabel({
+        name: "Cale Makar",
+        team: "COL",
+        positions: ["D"],
+      }),
+    ).toBe("Cale Makar, COL, D");
+    expect(formatDraftedLabel({ name: "Unknown", team: "", positions: ["G"] })).toBe("Unknown, G");
+    expect(
+      formatDraftedLabel({
+        name: "Auston Matthews",
+        team: "TOR",
+        positions: ["LW", "C"],
+      }),
+    ).toBe("Auston Matthews, TOR, C/LW");
   });
 });

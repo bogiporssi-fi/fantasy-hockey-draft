@@ -1,3 +1,4 @@
+import { formatEligibility } from "./positions";
 import { FANTASY_POSITIONS, type FantasyPosition } from "./types";
 
 export const MOCK_TEAM_COUNT = 20;
@@ -217,6 +218,20 @@ export function sortByAdp(players: MockPlayer[]): MockPlayer[] {
 
 export function sortPlayers(players: MockPlayer[], key: MockSortKey = "adp"): MockPlayer[] {
   return [...players].sort(key === "yahooRank" ? compareYahooRank : compareAdp);
+}
+
+/** Own-roster line: "Elias Pettersson, VAN, C/LW". */
+export function formatDraftedLabel(
+  player: Pick<MockPlayer, "name" | "team" | "positions">,
+): string {
+  const parts: string[] = [];
+  const name = player.name.trim();
+  if (name) parts.push(name);
+  const team = player.team.trim();
+  if (team) parts.push(team);
+  const pos = formatEligibility(player.positions);
+  if (pos) parts.push(pos);
+  return parts.join(", ");
 }
 
 /** Most recent first. Accepts a compact pick list or a sparse board. */

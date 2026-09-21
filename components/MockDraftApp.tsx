@@ -7,7 +7,7 @@ import {
   assignSlot,
   chooseBotPick,
   createEmptyRosters,
-  lastNPicks,
+  formatDraftedLabel,
   MOCK_ROUNDS,
   MOCK_SLOT_LIMITS,
   MOCK_TEAM_COUNT,
@@ -39,7 +39,7 @@ import { getServerStateSnapshot, getStateSnapshot, setAppState, subscribeState }
 import type { FantasyPosition, Lang } from "@/lib/types";
 import type { YahooPlayersPayload } from "@/lib/yahooPlayers";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 
 type Phase = "setup" | "lobby" | "drafting" | "done";
 type Tab = "draft" | "teams";
@@ -57,6 +57,46 @@ const SLOT_ORDER: MockSlot[] = ["C", "LW", "RW", "D", "G", "BN"];
 const BOT_DELAY_MS = 1100;
 const POLL_MS = 1500;
 const PID_KEY = "luistin-mock-participant";
+
+/** Keep overflow scroll stable across live pick updates (append/update, no remount). */
+function useStableListScroll(itemKey: string, follow: "bottom" | "anchor") {
+  const ref = useRef<HTMLUListElement>(null);
+  const stickToBottomRef = useRef(follow === "bottom");
+  const anchorRef = useRef<{ id: string; offset: number } | null>(null);
+
+  function onScroll(e: { currentTarget: HTMLUListElement }) {
+    const el = e.currentTarget;
+    if (follow === "bottom") {
+      stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
+    }
+    for (const child of Array.from(el.children)) {
+      if (!(child instanceof HTMLElement)) continue;
+      const id = child.dataset.scrollAnchor;
+      if (!id) continue;
+      if (child.offsetTop + child.offsetHeight > el.scrollTop + 1) {
+        anchorRef.current = { id, offset: child.offsetTop - el.scrollTop };
+        break;
+      }
+    }
+  }
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (follow === "bottom" && stickToBottomRef.current) {
+      el.scrollTop = el.scrollHeight;
+      return;
+    }
+    const anchor = anchorRef.current;
+    if (!anchor) return;
+    const node = el.querySelector(`[data-scroll-anchor="${CSS.escape(anchor.id)}"]`);
+    if (node instanceof HTMLElement) {
+      el.scrollTop = node.offsetTop - anchor.offset;
+    }
+  }, [itemKey, follow]);
+
+  return { ref, onScroll };
+}
 
 function emptyDraft(pool: MockPlayer[] = []): DraftState {
   return {
@@ -291,8 +331,13 @@ export function MockDraftApp() {
 
   useEffect(() => {
     if (phase !== "drafting") return;
-    userColumnRef.current?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-  }, [phase, livePickIndex]);
+    const col = userColumnRef.current;
+    if (!col) return;
+    const scroller = col.closest("[data-mock-board-scroll]");
+    if (!(scroller instanceof HTMLElement)) return;
+    const nextLeft = col.offsetLeft - (scroller.clientWidth - col.clientWidth) / 2;
+    scroller.scrollTo({ left: Math.max(0, nextLeft) });
+  }, [phase, userIndex]);
 
   const visiblePlayers = useMemo(() => {
     const q = normalizeName(query);
@@ -307,7 +352,7 @@ export function MockDraftApp() {
     });
   }, [liveRemaining, query, posFilter, sortKey]);
 
-  const recentPicks = useMemo(() => lastNPicks(livePicks, 10), [livePicks]);
+  const recentPicks = useMemo(() => livePicks.slice(-10), [livePicks]);
   const teamViews = useMemo(
     () => rosterByTeamViews(livePicks, userIndex),
     [livePicks, userIndex],
@@ -911,6 +956,9 @@ function LastTen({
   onToggle: () => void;
 }) {
   const c = t(lang);
+  const listKey = `${picks.length}:${picks.at(-1)?.pickIndex ?? ""}`;
+  const { ref: scrollerRef, onScroll } = useStableListScroll(listKey, "bottom");
+
   return (
     <section className="rounded-xl border border-line bg-panel p-3">
       <div className="flex items-center justify-between gap-2">
@@ -923,10 +971,18 @@ function LastTen({
           {open ? c.mockHideLastTen : c.mockShowLastTen}
         </button>
       </div>
-      <ul className={`mt-2 space-y-1 ${open ? "block" : "hidden sm:block"}`}>
+      <ul
+        ref={scrollerRef}
+        onScroll={onScroll}
+        className={`mt-2 max-h-48 space-y-1 overflow-y-auto overscroll-contain [overflow-anchor:none] ${open ? "block" : "hidden sm:block"}`}
+      >
         {picks.length === 0 && <li className="text-xs text-muted">—</li>}
         {picks.map((p) => (
-          <li key={p.pickIndex} className="flex min-h-9 items-baseline gap-2 text-xs">
+          <li
+            key={p.pickIndex}
+            data-scroll-anchor={String(p.pickIndex)}
+            className="flex min-h-9 items-baseline gap-2 text-xs"
+          >
             <span className="w-10 shrink-0 font-mono text-ice/80 tabular">#{p.pickIndex + 1}</span>
             <span className="w-14 shrink-0 text-muted">
               {p.teamIndex === userIndex ? c.mockYou : c.mockTeam.replace("{n}", String(p.teamIndex + 1))}
@@ -970,7 +1026,7 @@ function OwnRoster({
           · {c.mockBenchShort}\u00a0{remaining.BN}
         </p>
       </div>
-      <SlotGrid lang={lang} roster={roster} byId={byId} />
+      <SlotGrid lang={lang} roster={roster} byId={byId} detailed />
     </section>
   );
 }
@@ -979,10 +1035,12 @@ function SlotGrid({
   lang,
   roster,
   byId,
+  detailed = false,
 }: {
   lang: Lang;
   roster: TeamRoster;
   byId: Map<string, MockPlayer>;
+  detailed?: boolean;
 }) {
   const c = t(lang);
   return (
@@ -998,9 +1056,14 @@ function SlotGrid({
             {Array.from({ length: limit }, (_, i) => {
               const pick = rows[i];
               const nhl = pick ? byId.get(pick.playerId) : null;
+              const label = nhl ? (detailed ? formatDraftedLabel(nhl) : nhl.lastName) : "—";
               return (
-                <p key={i} className="truncate text-xs text-white/90">
-                  {nhl ? nhl.lastName : "—"}
+                <p
+                  key={i}
+                  className={`text-xs text-white/90 ${detailed ? "leading-snug" : "truncate"}`}
+                  title={nhl ? label : undefined}
+                >
+                  {label}
                 </p>
               );
             })}
@@ -1098,6 +1161,12 @@ function PlayerPicker({
   onPick: (p: MockPlayer) => void;
 }) {
   const c = t(lang);
+  const listKey = `${players.length}:${players[0]?.id ?? ""}:${players.at(-1)?.id ?? ""}`;
+  const { ref: scrollerRef, onScroll } = useStableListScroll(listKey, "anchor");
+  useLayoutEffect(() => {
+    const el = scrollerRef.current;
+    if (el) el.scrollTop = 0;
+  }, [query, posFilter, sortKey, scrollerRef]);
   return (
     <section className="rounded-xl border border-line bg-panel p-3">
       <input
@@ -1173,7 +1242,11 @@ function PlayerPicker({
         </button>
         <span className="flex-1">{c.players}</span>
       </div>
-      <ul className="mt-1 max-h-[min(24rem,50vh)] overflow-auto">
+      <ul
+        ref={scrollerRef}
+        onScroll={onScroll}
+        className="mt-1 max-h-[min(24rem,50vh)] overflow-auto [overflow-anchor:none]"
+      >
         {players.length === 0 && (
           <li className="px-1 py-3 text-sm text-muted">{c.mockEmptyList}</li>
         )}
@@ -1181,7 +1254,7 @@ function PlayerPicker({
           const fits = assignSlot(p.positions, remainingSlotsNow) !== null;
           const disabled = !isUserTurn || !fits;
           return (
-            <li key={p.id} className="border-b border-line/60 last:border-0">
+            <li key={p.id} data-scroll-anchor={p.id} className="border-b border-line/60 last:border-0">
               <button
                 type="button"
                 disabled={disabled}
@@ -1230,7 +1303,7 @@ function DraftBoard({
   return (
     <section className="rounded-xl border border-line bg-panel p-2 sm:p-3">
       <h2 className="mb-2 px-1 text-sm font-medium text-white">{c.mockDraftBoard}</h2>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" data-mock-board-scroll>
         <div
           className="grid min-w-[72rem] gap-px"
           style={{ gridTemplateColumns: `2.25rem repeat(${MOCK_TEAM_COUNT}, minmax(4.4rem, 1fr))` }}
