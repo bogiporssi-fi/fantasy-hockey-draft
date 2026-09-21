@@ -35,9 +35,9 @@ No Yahoo OAuth, no passwords. Category scoring projections are out of scope — 
 
 ## Mock draft (`/mock`)
 
-Separate 20-team Yahoo **snake mock** (not the overlap helper). Solo + 19 ADP-aware bots, or a **shared room** so other humans can claim empty seats. Player pool, `average_pick` (ADP) and overall rank (`player_ranks` where `rank_type === "OR"`, shown as **YR**) come from Yahoo’s public fantasy endpoint (`out=draft_analysis,ranks`; NHL `game_key` verified at runtime, currently `477`) — no OAuth. Cached about a day; Finnish error if Yahoo is down.
+Separate 20-team Yahoo **snake mock** (not the overlap helper). Solo + 19 ADP-aware bots, or a **shared room** so other humans can claim empty seats. Player pool, `average_pick` (ADP) and overall rank (`player_ranks` where `rank_type === "OR"`, shown as **Rank**) come from Yahoo’s public fantasy endpoint (`out=draft_analysis,ranks`; NHL `game_key` verified at runtime, currently `477`) — no OAuth. Cached about a day; Finnish error if Yahoo is down.
 
-During a mock: **Draft** tab has the board, available players (sort ADP or Yahoo-rank), and the last 10 picks. **Joukkueet** shows each of the 20 teams’ drafted players.
+During a mock the UI follows Yahoo Fantasy Hockey’s mobile draft chrome (Finnish labels, no Yahoo marks): **Pelaajat** (available list, Rank + ADP sort), **Jono** (starred queue), **Board** (snake grid), **Tulokset** (rosters + chronological picks). Own roster slots show `Name, TEAM, POS`. Lists keep scroll position while bots pick.
 
 ### Multiplayer rooms
 

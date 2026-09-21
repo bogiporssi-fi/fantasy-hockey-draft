@@ -3,18 +3,25 @@ import type { FantasyPosition } from "./types";
 import {
   applyPick,
   assignSlot,
+  boardCellLabel,
   buildSnakeOrder,
   chooseBotPick,
   compareAdp,
   compareYahooRank,
   createEmptyRosters,
+  formatDraftedLabel,
+  formatLastPickTicker,
+  formatPosTeam,
+  formatShortName,
   lastNPicks,
+  matchesPosFilter,
   MOCK_ROUNDS,
   MOCK_SLOT_LIMITS,
   MOCK_TEAM_COUNT,
   MOCK_TOTAL_PICKS,
   needAwareCandidates,
   pickIndexForTeamRound,
+  picksUntilTurn,
   remainingSlots,
   rosterRespectsLimits,
   rosterByTeamViews,
@@ -25,6 +32,7 @@ import {
   sortByAdp,
   sortPlayers,
   starterSlotFor,
+  stripSlotsFromRoster,
   weightedIndex,
   type MockDraftPickRecord,
   type MockPlayer,
@@ -325,6 +333,92 @@ describe("roster-by-team view model", () => {
     expect(views[1].picks).toHaveLength(1);
     expect(views[2].picks).toHaveLength(0);
     expect(rosterByTeamViews(picks, null).every((v) => v.isUser === false)).toBe(true);
+  });
+});
+
+describe("own-roster drafted label", () => {
+  it("joins full name, NHL team abbr, and Yahoo eligible positions", () => {
+    expect(
+      formatDraftedLabel({
+        name: "Elias Pettersson",
+        team: "VAN",
+        positions: ["C", "LW"],
+      }),
+    ).toBe("Elias Pettersson, VAN, C/LW");
+    expect(
+      formatDraftedLabel({
+        name: "Cale Makar",
+        team: "COL",
+        positions: ["D"],
+      }),
+    ).toBe("Cale Makar, COL, D");
+    expect(formatDraftedLabel({ name: "Unknown", team: "", positions: ["G"] })).toBe("Unknown, G");
+    expect(
+      formatDraftedLabel({
+        name: "Auston Matthews",
+        team: "TOR",
+        positions: ["LW", "C"],
+      }),
+    ).toBe("Auston Matthews, TOR, C/LW");
+  });
+});
+
+describe("yahoo-like name lines", () => {
+  it("shortens to initial + last name and POS • TEAM", () => {
+    expect(
+      formatShortName({ firstName: "Zach", lastName: "Werenski", name: "Zach Werenski" }),
+    ).toBe("Z. WERENSKI");
+    expect(
+      formatPosTeam({ positions: ["C", "LW"], team: "NJ" }),
+    ).toBe("C,LW • NJ");
+    expect(
+      formatLastPickTicker({
+        firstName: "Auston",
+        lastName: "Matthews",
+        name: "Auston Matthews",
+        positions: ["C"],
+        team: "TOR",
+      }),
+    ).toBe("A. MATTHEWS (C • TOR)");
+  });
+});
+
+describe("picks until turn and board labels", () => {
+  it("counts snake seats until the user is on the clock", () => {
+    expect(picksUntilTurn(0, 0)).toBe(0);
+    expect(picksUntilTurn(0, 2)).toBe(2);
+    expect(picksUntilTurn(13, 13)).toBe(0);
+    expect(picksUntilTurn(19, 0)).toBe(20);
+    expect(picksUntilTurn(0, null)).toBe(-1);
+  });
+
+  it("labels snake cells as round.pickInRound", () => {
+    expect(boardCellLabel(0, 0)).toBe("1.1");
+    expect(boardCellLabel(19, 0)).toBe("1.20");
+    expect(boardCellLabel(0, 1)).toBe("2.20");
+    expect(boardCellLabel(19, 1)).toBe("2.1");
+    expect(boardCellLabel(0, 2)).toBe("3.1");
+  });
+
+  it("filters skaters vs goalies", () => {
+    const c = player("1", "Connor McDavid", ["C"], 1.5);
+    const g = player("2", "Andrei Vasilevskiy", ["G"], 11);
+    expect(matchesPosFilter(c, "ALL")).toBe(true);
+    expect(matchesPosFilter(c, "FD")).toBe(true);
+    expect(matchesPosFilter(g, "FD")).toBe(false);
+    expect(matchesPosFilter(g, "G")).toBe(true);
+    expect(matchesPosFilter(c, "C")).toBe(true);
+  });
+
+  it("fills the roster strip in slot order", () => {
+    const p1 = player("1", "Elias Pettersson", ["C", "LW"], 12, 12);
+    p1.team = "VAN";
+    const roster = applyPick(createEmptyRosters(1)[0], p1, 0)!;
+    const byId = new Map([[p1.id, p1]]);
+    const strip = stripSlotsFromRoster(roster, byId);
+    expect(strip[0]).toMatchObject({ slot: "C", player: p1, pickIndex: 0 });
+    expect(strip[1].player).toBeNull();
+    expect(strip.filter((s) => s.slot === "C")).toHaveLength(2);
   });
 });
 

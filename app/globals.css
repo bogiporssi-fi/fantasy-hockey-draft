@@ -50,3 +50,15 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+.mock-shell {
+  --mock-purple: #7c3aed;
+  --mock-purple-soft: #f3e8ff;
+  --mock-teal: #0f766e;
+  color: #111827;
+  background: #f6f7fb;
+}
+
+.mock-shell * {
+  scrollbar-color: #d1d5db transparent;
+}
