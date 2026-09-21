@@ -181,6 +181,7 @@ const fi = {
   mockStart: "Aloita mock",
   mockYourTurn: "On vuorosi",
   mockBotPicking: "Botti valitsee…",
+  mockOtherPicking: "J{n} valitsee…",
   mockRound: "Kierros",
   mockPickOf: "Valinta {n}/{total}",
   mockTeam: "J{n}",
@@ -235,6 +236,7 @@ const fi = {
   mockSelectTeam: "Joukkue",
   mockSoloHint: "Yksin botteja vastaan, tai luo jaettu huone kavereille.",
   mockBackToSetup: "Takaisin alkuun",
+  mockRoomLoading: "Ladataan huonetta…",
 };
 
 const en: typeof fi = {
@@ -418,6 +420,7 @@ const en: typeof fi = {
   mockStart: "Start mock",
   mockYourTurn: "You're on the clock",
   mockBotPicking: "Bot is picking…",
+  mockOtherPicking: "T{n} is picking…",
   mockRound: "Round",
   mockPickOf: "Pick {n}/{total}",
   mockTeam: "T{n}",
@@ -472,6 +475,7 @@ const en: typeof fi = {
   mockSelectTeam: "Team",
   mockSoloHint: "Solo vs bots, or create a shared room for friends.",
   mockBackToSetup: "Back to setup",
+  mockRoomLoading: "Loading room…",
 };
 
 export const copy = { fi, en };

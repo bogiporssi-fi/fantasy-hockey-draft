@@ -255,6 +255,9 @@ export function MockDraftApp() {
     livePickIndex < MOCK_TOTAL_PICKS &&
     userIndex != null &&
     currentTeam === userIndex;
+  const currentSeatKind = room ? room.seats[currentTeam]?.kind : "bot";
+  const waitingOnOtherHuman =
+    phase === "drafting" && !isUserTurn && currentSeatKind === "human";
   const userRoster = userIndex != null ? liveRosters[userIndex] : undefined;
   const userRemaining = userRoster
     ? remainingSlots(userRoster.filled)
@@ -518,7 +521,7 @@ export function MockDraftApp() {
 
       {roomId && !room && !roomLoadError && (
         <p className="rounded-xl border border-line bg-panel px-4 py-8 text-center text-muted">
-          {c.loading}
+          {c.mockRoomLoading}
         </p>
       )}
 
@@ -561,6 +564,8 @@ export function MockDraftApp() {
             phase={phase === "done" ? "done" : "drafting"}
             pickIndex={livePickIndex}
             isUserTurn={isUserTurn}
+            waitingOnOtherHuman={waitingOnOtherHuman}
+            currentTeam={currentTeam}
             lastPick={lastPick}
             userIndex={userIndex ?? -1}
           />
@@ -840,6 +845,8 @@ function StatusBar({
   phase,
   pickIndex,
   isUserTurn,
+  waitingOnOtherHuman,
+  currentTeam,
   lastPick,
   userIndex,
 }: {
@@ -847,11 +854,21 @@ function StatusBar({
   phase: Phase;
   pickIndex: number;
   isUserTurn: boolean;
+  waitingOnOtherHuman?: boolean;
+  currentTeam?: number;
   lastPick: MockDraftPickRecord | null;
   userIndex: number;
 }) {
   const c = t(lang);
   const round = Math.min(roundOfPick(Math.min(pickIndex, MOCK_TOTAL_PICKS - 1)), MOCK_ROUNDS);
+  const headline =
+    phase === "done"
+      ? c.mockComplete
+      : isUserTurn
+        ? c.mockYourTurn
+        : waitingOnOtherHuman
+          ? c.mockOtherPicking.replace("{n}", String((currentTeam ?? 0) + 1))
+          : c.mockBotPicking;
   return (
     <div
       className={`rounded-xl border px-3 py-3 ${
@@ -864,13 +881,7 @@ function StatusBar({
       aria-live="polite"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-sm font-semibold text-white">
-          {phase === "done"
-            ? c.mockComplete
-            : isUserTurn
-              ? c.mockYourTurn
-              : c.mockBotPicking}
-        </p>
+        <p className="text-sm font-semibold text-white">{headline}</p>
         <p className="text-xs text-muted tabular">
           {c.mockRound} {round} · {c.mockPickOf.replace("{n}", String(Math.min(pickIndex + 1, MOCK_TOTAL_PICKS))).replace("{total}", String(MOCK_TOTAL_PICKS))}
         </p>
