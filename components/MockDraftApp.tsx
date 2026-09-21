@@ -185,6 +185,7 @@ export function MockDraftApp() {
 
   function pickHuman(player: MockPlayer) {
     if (!isUserTurn) return;
+    setQuery("");
     setDraft((prev) => {
       if (snakeTeamIndex(prev.pickIndex) !== userIndex) return prev;
       const roster = prev.rosters[userIndex];
@@ -390,7 +391,7 @@ function Setup({
           </button>
         ))}
       </div>
-      <p className="mt-2 text-xs text-muted">{c.mockSlotHint.replace("{n}", String(slot))}</p>
+      <p className="mt-2 text-xs text-muted">{c.mockSlotHint.replaceAll("{n}", String(slot))}</p>
       <button
         type="button"
         onClick={onStart}
@@ -474,9 +475,9 @@ function OwnRoster({
         <p className="text-[11px] text-muted">
           {c.mockOpenStarters}:{" "}
           {(["C", "LW", "RW", "D", "G"] as const)
-            .map((s) => `${s} ${remaining[s]}`)
+            .map((s) => `${s}\u00a0${remaining[s]}`)
             .join(" · ")}{" "}
-          · {c.mockBenchShort} {remaining.BN}
+          · {c.mockBenchShort}\u00a0{remaining.BN}
         </p>
       </div>
       <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
