@@ -1,6 +1,6 @@
 "use client";
 
-import { AppNav, LuistinLogo } from "@/components/AppNav";
+import { LuistinLogo } from "@/components/AppNav";
 import { useStableListScroll } from "@/components/useStableListScroll";
 import { t, type Copy } from "@/lib/i18n";
 import {
@@ -736,29 +736,31 @@ function Setup({
   const appState = useSyncExternalStore(subscribeState, getStateSnapshot, getServerStateSnapshot);
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col px-4 py-4">
-      <header className="mb-4 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <LuistinLogo />
-          <div>
-            <h1 className="text-lg font-semibold text-zinc-900">{c.mockTitle}</h1>
-            <p className="text-xs text-zinc-500">{c.mockTagline}</p>
+      <header className="mb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <LuistinLogo />
+            <div className="min-w-0">
+              <h1 className="text-lg font-semibold leading-tight text-zinc-900">{c.mockTitle}</h1>
+              <p className="text-xs text-zinc-500">{c.mockTagline}</p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <AppNav lang={lang} active="mock" />
-          <div className="flex overflow-hidden rounded-full border border-zinc-200 text-[11px]">
+          <div className="flex shrink-0 overflow-hidden rounded-full border border-zinc-200 text-[11px] font-semibold">
             {(["fi", "en"] as const).map((code) => (
               <button
                 key={code}
                 type="button"
                 onClick={() => setAppState({ ...appState, lang: code })}
-                className={`px-2 py-1 uppercase ${appState.lang === code ? "bg-[var(--mock-purple)] text-white" : "text-zinc-500"}`}
+                className={`px-2.5 py-1 uppercase ${appState.lang === code ? "bg-[var(--mock-purple)] text-white" : "text-zinc-500"}`}
               >
                 {code}
               </button>
             ))}
           </div>
         </div>
+        <a href="/" className="mt-2 inline-block text-sm font-medium text-[var(--mock-purple)]">
+          {c.helperNav}
+        </a>
       </header>
       <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
         <p className="text-sm text-zinc-800">{c.mockSetupLead}</p>
@@ -1322,6 +1324,7 @@ function PlayersTab({
                   <button
                     type="button"
                     disabled={isUserTurn && !fits}
+                    aria-label={isUserTurn && fits ? `${c.mockPickPlayer} ${p.name}` : p.name}
                     onClick={() => {
                       if (isUserTurn && fits) onPick(p);
                     }}
@@ -1335,14 +1338,10 @@ function PlayersTab({
                       <span className="block truncate text-[11px] text-[var(--mock-teal)]">
                         {formatPosTeam(p)}
                       </span>
+                      {isUserTurn && !fits && (
+                        <span className="block text-[10px] text-zinc-400">{c.mockNoFit}</span>
+                      )}
                     </span>
-                    {isUserTurn && (
-                      <span
-                        className={`shrink-0 text-[10px] font-semibold ${fits ? "text-[var(--mock-purple)]" : "text-zinc-400"}`}
-                      >
-                        {fits ? c.mockPickPlayer : c.mockNoFit}
-                      </span>
-                    )}
                   </button>
                 </div>
                 <span className="text-right text-sm font-semibold tabular text-zinc-800">
@@ -1432,7 +1431,7 @@ function BoardTab({
   const c = t(lang);
   return (
     <div className="relative h-full">
-      <div className="h-full overflow-auto pb-24" data-mock-board-scroll>
+      <div className="h-full overflow-auto pb-28" data-mock-board-scroll>
         <div
           className="grid min-w-[72rem] gap-px p-2"
           style={{ gridTemplateColumns: `repeat(${MOCK_TEAM_COUNT}, minmax(5.2rem, 1fr))` }}
@@ -1496,7 +1495,7 @@ function BoardTab({
       <button
         type="button"
         onClick={onShowMyTeam}
-        className="absolute bottom-16 left-1/2 z-10 -translate-x-1/2 rounded-full bg-[var(--mock-purple)] px-4 py-2 text-sm font-semibold text-white shadow-lg"
+        className="absolute bottom-24 left-1/2 z-10 -translate-x-1/2 rounded-full bg-[var(--mock-purple)] px-4 py-2 text-sm font-semibold text-white shadow-lg"
       >
         {c.mockShowMyTeam}
       </button>
@@ -1763,7 +1762,7 @@ function SettingsSheet({
   onLeave: () => void;
 }) {
   return (
-    <div className="absolute inset-0 z-40 flex items-end bg-black/30" onClick={onClose} role="presentation">
+    <div className="absolute inset-0 z-50 flex items-end bg-black/30" onClick={onClose} role="presentation">
       <div
         className="w-full rounded-t-2xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -1898,10 +1897,10 @@ function IconButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className={`inline-flex h-10 w-10 items-center justify-center rounded-full border ${
+      className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
         active
-          ? "border-[var(--mock-purple)] bg-[var(--mock-purple-soft)] text-[var(--mock-purple)]"
-          : "border-zinc-200 bg-white text-zinc-700"
+          ? "bg-[var(--mock-purple-soft)] text-[var(--mock-purple)]"
+          : "text-zinc-700"
       }`}
     >
       {children}
