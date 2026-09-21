@@ -48,7 +48,8 @@ export type RoomErrorCode =
   | "not_your_turn"
   | "player_gone"
   | "no_slot"
-  | "busy";
+  | "busy"
+  | "storage_unavailable";
 
 export type RoomResult<T> = { ok: true; value: T } | { ok: false; error: RoomErrorCode };
 

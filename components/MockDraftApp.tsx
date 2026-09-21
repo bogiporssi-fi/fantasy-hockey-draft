@@ -38,6 +38,7 @@ import {
 } from "@/lib/mockDraft";
 import {
   freeSeatCount,
+  isParticipantId,
   normalizeRoomId,
   seatForParticipant,
   type RoomState,
@@ -133,6 +134,27 @@ function roomLink(id: string): string {
   return `${window.location.origin}/mock?room=${id}`;
 }
 
+function ensureParticipantId(): string {
+  if (typeof window === "undefined") return "";
+  let id = window.localStorage.getItem(PID_KEY);
+  if (!isParticipantId(id)) {
+    id = crypto.randomUUID();
+    window.localStorage.setItem(PID_KEY, id);
+  }
+  return id ?? "";
+}
+
+async function parseJsonBody(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
 function roomErrorCopy(code: string | null | undefined, c: Copy): string {
   switch (code) {
     case "seat_taken":
@@ -149,8 +171,9 @@ function roomErrorCopy(code: string | null | undefined, c: Copy): string {
       return c.mockRoomMissing;
     case "busy":
       return c.mockBusy;
+    case "storage_unavailable":
     default:
-      return c.mockYahooError;
+      return c.mockStorageDown;
   }
 }
 
@@ -247,12 +270,7 @@ export function MockDraftApp() {
   }
 
   useEffect(() => {
-    let id = window.localStorage.getItem(PID_KEY);
-    if (!id) {
-      id = crypto.randomUUID();
-      window.localStorage.setItem(PID_KEY, id);
-    }
-    setParticipantId(id);
+    setParticipantId(ensureParticipantId());
   }, []);
 
   useEffect(() => {
@@ -295,18 +313,24 @@ export function MockDraftApp() {
     async function pull() {
       try {
         const res = await fetch(`/api/mock/room/${roomId}`);
-        const json = await res.json();
+        const json = await parseJsonBody(res);
         if (cancelled) return;
         if (!res.ok) {
           setRoom(null);
-          setRoomLoadError(String(json.error ?? "not_found"));
+          setRoomLoadError(String(json.error ?? "storage_unavailable"));
           return;
         }
-        setRoom(json.room as RoomState);
+        const next = json.room as RoomState | undefined;
+        if (!next?.id) {
+          setRoom(null);
+          setRoomLoadError("storage_unavailable");
+          return;
+        }
+        setRoom(next);
         setStorageKind((json.storage as RoomStorageKind) ?? null);
         setRoomLoadError(null);
       } catch {
-        if (!cancelled) setRoomLoadError("not_found");
+        if (!cancelled) setRoomLoadError("storage_unavailable");
       }
     }
     void pull();
@@ -433,43 +457,65 @@ export function MockDraftApp() {
   async function postRoom(body: Record<string, unknown>): Promise<RoomState | null> {
     if (!roomId && body.action) return null;
     const url = body.action ? `/api/mock/room/${roomId}` : "/api/mock/room";
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      setActionError(roomErrorCopy(String(json.error ?? ""), c));
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20000),
+      });
+      const json = await parseJsonBody(res);
+      if (!res.ok) {
+        setActionError(roomErrorCopy(String(json.error ?? "storage_unavailable"), c));
+        return null;
+      }
+      const next = json.room as RoomState | undefined;
+      if (!next?.id) {
+        setActionError(roomErrorCopy("storage_unavailable", c));
+        return null;
+      }
+      setRoom(next);
+      setStorageKind((json.storage as RoomStorageKind) ?? null);
+      setActionError(null);
+      return next;
+    } catch {
+      setActionError(roomErrorCopy("storage_unavailable", c));
       return null;
     }
-    const next = json.room as RoomState;
-    setRoom(next);
-    setStorageKind((json.storage as RoomStorageKind) ?? null);
-    setActionError(null);
-    return next;
   }
 
   async function createRoom() {
-    if (!participantId) return;
+    const pid = participantId || ensureParticipantId();
+    if (pid && pid !== participantId) setParticipantId(pid);
+    if (!isParticipantId(pid)) {
+      setActionError(roomErrorCopy("storage_unavailable", c));
+      return;
+    }
     setBusy(true);
     try {
       const res = await fetch("/api/mock/room", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ participantId, slot }),
+        body: JSON.stringify({ participantId: pid, slot }),
+        signal: AbortSignal.timeout(20000),
       });
-      const json = await res.json();
+      const json = await parseJsonBody(res);
       if (!res.ok) {
-        setActionError(roomErrorCopy(String(json.error ?? ""), c));
+        setActionError(roomErrorCopy(String(json.error ?? "storage_unavailable"), c));
         return;
       }
-      const next = json.room as RoomState;
+      const next = json.room as RoomState | undefined;
+      if (!next?.id) {
+        setActionError(roomErrorCopy("storage_unavailable", c));
+        return;
+      }
       setRoom(next);
       setStorageKind((json.storage as RoomStorageKind) ?? null);
       setActionError(null);
       setTab("players");
       router.replace(`/mock?room=${next.id}`);
+    } catch {
+      setActionError(roomErrorCopy("storage_unavailable", c));
     } finally {
       setBusy(false);
     }
@@ -580,7 +626,11 @@ export function MockDraftApp() {
 
       {roomLoadError && roomId && (
         <div className="px-4 py-16 text-center">
-          <p className="text-sm text-red-600">{c.mockRoomMissing}</p>
+          <p className="text-sm text-red-600" role="alert">
+            {roomLoadError === "not_found" || roomLoadError === "invalid_room"
+              ? c.mockRoomMissing
+              : c.mockStorageDown}
+          </p>
           <button
             type="button"
             onClick={restart}
@@ -789,7 +839,11 @@ function Setup({
           ))}
         </div>
         <p className="mt-2 text-xs text-zinc-500">{c.mockSlotHint.replaceAll("{n}", String(slot))}</p>
-        {actionError && <p className="mt-2 text-sm text-red-600">{actionError}</p>}
+        {actionError && (
+          <p className="mt-2 text-sm text-red-600" role="alert">
+            {actionError}
+          </p>
+        )}
         <div className="mt-4 flex flex-col gap-2">
           <button
             type="button"
@@ -804,7 +858,7 @@ function Setup({
             disabled={creating}
             className="min-h-11 w-full rounded-full border border-[var(--mock-purple)] px-4 text-sm font-semibold text-[var(--mock-purple)] disabled:opacity-60"
           >
-            {c.mockCreateRoom}
+            {creating ? `${c.mockCreateRoom}…` : c.mockCreateRoom}
           </button>
         </div>
       </section>
@@ -906,7 +960,11 @@ function Lobby({
             );
           })}
         </div>
-        {actionError && <p className="mt-2 text-sm text-red-600">{actionError}</p>}
+        {actionError && (
+          <p className="mt-2 text-sm text-red-600" role="alert">
+            {actionError}
+          </p>
+        )}
         {isHost && (
           <button
             type="button"
@@ -1080,7 +1138,11 @@ function DraftRoom({
         </div>
       )}
 
-      {actionError && <p className="px-3 text-xs text-red-600">{actionError}</p>}
+      {actionError && (
+        <p className="px-3 text-xs text-red-600" role="alert">
+          {actionError}
+        </p>
+      )}
 
       <div className="relative min-h-0 flex-1">
         {tab === "players" && (
