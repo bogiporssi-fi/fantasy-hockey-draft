@@ -4,26 +4,72 @@ import type { RoomState, RoomStorageKind } from "./mockRoom";
 export const ROOM_TTL_SECONDS = 6 * 60 * 60;
 const KEY_PREFIX = "luistin:mock:";
 
-function envUrl(): string {
-  return process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "";
+/** Vercel Marketplace sometimes prefixes Upstash KV names with the resource id. */
+const REDIS_REST_PAIRS: ReadonlyArray<readonly [string, string]> = [
+  ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
+  ["UPSTASH_REDIS_REST_KV_REST_API_URL", "UPSTASH_REDIS_REST_KV_REST_API_TOKEN"],
+  ["KV_REST_API_URL", "KV_REST_API_TOKEN"],
+];
+
+export class RoomStorageError extends Error {
+  readonly code = "storage_unavailable" as const;
+  constructor(cause?: unknown) {
+    super("storage_unavailable", { cause });
+    this.name = "RoomStorageError";
+  }
 }
 
-function envToken(): string {
-  return process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || "";
+function readEnv(env: NodeJS.Dict<string>, key: string): string {
+  const raw = env[key];
+  return typeof raw === "string" ? raw.trim() : "";
 }
 
-export function getRoomStorageKind(): RoomStorageKind {
-  return envUrl() && envToken() ? "redis" : "memory";
+/** HTTPS REST URL + token. Skips TCP `rediss://` URLs that crash @upstash/redis. */
+export function pickRedisRestConfig(
+  env: NodeJS.Dict<string> = process.env,
+): { url: string; token: string } | null {
+  for (const [urlKey, tokenKey] of REDIS_REST_PAIRS) {
+    const url = readEnv(env, urlKey);
+    const token = readEnv(env, tokenKey);
+    if (url.startsWith("https://") && token) return { url, token };
+  }
+  return null;
+}
+
+export function getRoomStorageKind(env: NodeJS.Dict<string> = process.env): RoomStorageKind {
+  return pickRedisRestConfig(env) ? "redis" : "memory";
 }
 
 let redisClient: Redis | null | undefined;
 
+function asStorageError(err: unknown): RoomStorageError {
+  return err instanceof RoomStorageError ? err : new RoomStorageError(err);
+}
+
 function getRedis(): Redis | null {
   if (redisClient !== undefined) return redisClient;
-  const url = envUrl();
-  const token = envToken();
-  redisClient = url && token ? new Redis({ url, token }) : null;
-  return redisClient;
+  const cfg = pickRedisRestConfig();
+  if (!cfg) {
+    redisClient = null;
+    return null;
+  }
+  try {
+    redisClient = new Redis({
+      url: cfg.url,
+      token: cfg.token,
+      cache: "no-store",
+      retry: false,
+    });
+    return redisClient;
+  } catch (err) {
+    redisClient = undefined;
+    throw asStorageError(err);
+  }
+}
+
+/** Test-only: forget the cached Redis client after env stubs. */
+export function resetRoomStoreForTests() {
+  redisClient = undefined;
 }
 
 type MemRow = { room: RoomState; expiresAt: number };
@@ -45,19 +91,37 @@ function memSet(room: RoomState) {
 }
 
 export async function readRoom(id: string): Promise<RoomState | null> {
-  const redis = getRedis();
+  let redis: Redis | null;
+  try {
+    redis = getRedis();
+  } catch (err) {
+    throw asStorageError(err);
+  }
   if (redis) {
-    const room = await redis.get<RoomState>(KEY_PREFIX + id);
-    return room ?? null;
+    try {
+      const room = await redis.get<RoomState>(KEY_PREFIX + id);
+      return room ?? null;
+    } catch (err) {
+      throw asStorageError(err);
+    }
   }
   return memGet(id);
 }
 
 export async function createRoomIfAbsent(room: RoomState): Promise<boolean> {
-  const redis = getRedis();
+  let redis: Redis | null;
+  try {
+    redis = getRedis();
+  } catch (err) {
+    throw asStorageError(err);
+  }
   if (redis) {
-    const got = await redis.set(KEY_PREFIX + room.id, room, { nx: true, ex: ROOM_TTL_SECONDS });
-    return Boolean(got);
+    try {
+      const got = await redis.set(KEY_PREFIX + room.id, room, { nx: true, ex: ROOM_TTL_SECONDS });
+      return Boolean(got);
+    } catch (err) {
+      throw asStorageError(err);
+    }
   }
   if (memGet(room.id)) return false;
   memSet(room);
@@ -81,11 +145,21 @@ export async function mutateRoom(
   id: string,
   mutator: (room: RoomState) => MutatorResult,
 ): Promise<MutatorResult> {
-  const redis = getRedis();
+  let redis: Redis | null;
+  try {
+    redis = getRedis();
+  } catch (err) {
+    throw asStorageError(err);
+  }
   if (redis) {
     const lockKey = `${KEY_PREFIX}${id}:lock`;
     const token = crypto.randomUUID();
-    const locked = await acquireRedisLock(redis, lockKey, token);
+    let locked = false;
+    try {
+      locked = await acquireRedisLock(redis, lockKey, token);
+    } catch (err) {
+      throw asStorageError(err);
+    }
     if (!locked) return { ok: false, error: "busy", status: 409 };
     try {
       const current = await redis.get<RoomState>(KEY_PREFIX + id);
@@ -100,9 +174,15 @@ export async function mutateRoom(
       };
       await redis.set(KEY_PREFIX + id, stamped, { ex: ROOM_TTL_SECONDS });
       return { ok: true, room: stamped };
+    } catch (err) {
+      throw asStorageError(err);
     } finally {
-      const held = await redis.get<string>(lockKey);
-      if (held === token) await redis.del(lockKey);
+      try {
+        const held = await redis.get<string>(lockKey);
+        if (held === token) await redis.del(lockKey);
+      } catch {
+        // lock TTL covers a failed unlock
+      }
     }
   }
 

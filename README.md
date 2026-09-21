@@ -45,10 +45,13 @@ Host picks a slot → **Luo jaettu huone** → share `/mock?room=XXXXXX`. Others
 
 Room JSON lives in **Upstash Redis** when env vars are set (Vercel KV / Upstash Marketplace). Otherwise it stays in the Node process (two local browsers on `next dev` work; Vercel serverless needs Redis).
 
-Production env (either pair):
+Production env (first HTTPS REST pair wins):
 
-- `KV_REST_API_URL` + `KV_REST_API_TOKEN` (Vercel KV / Upstash on Marketplace)
-- or `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`
+- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`
+- or Marketplace-prefixed `UPSTASH_REDIS_REST_KV_REST_API_URL` + `UPSTASH_REDIS_REST_KV_REST_API_TOKEN`
+- or `KV_REST_API_URL` + `KV_REST_API_TOKEN`
+
+TCP URLs (`rediss://` / `KV_URL`) are ignored — `@upstash/redis` only speaks HTTPS REST.
 
 Rooms expire after 6 hours. Solo mock and the draft helper do not need these vars.
 

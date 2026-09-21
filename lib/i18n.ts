@@ -223,13 +223,15 @@ const fi = {
   mockSeatBot: "Botti",
   mockShareHint: "Jaa linkki — muut ihmiset valitsevat tyhjän sijan. Botit täyttävät tyhjät aloituksessa.",
   mockStorageMemory:
-    "Huone elää tässä palvelinprosessissa. Vercelillä aseta KV_REST_API_URL + KV_REST_API_TOKEN (tai UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN).",
+    "Huone elää tässä palvelinprosessissa. Vercelillä tarvitaan Upstash Redis REST-URL + token (https://…). Marketplace voi nimetä ne UPSTASH_REDIS_REST_KV_REST_API_*.",
   mockRoomMissing: "Huonetta ei löytynyt.",
   mockSeatTaken: "Paikka on jo varattu.",
   mockNotHost: "Vain isäntä voi aloittaa.",
   mockNotYourTurn: "Ei ole vuorosi.",
   mockNotLobby: "Luonnos on jo alkanut — paikat lukittu.",
   mockBusy: "Huone on hetken varattu. Yritä uudelleen.",
+  mockStorageDown:
+    "Jaettua huonetta ei voitu luoda tai synkronoida. Redis tai huone-API ei vastaa — yritä uudelleen.",
   mockHideLastTen: "Piilota",
   mockShowLastTen: "Näytä",
   mockYourTeam: "Oma joukkue",
@@ -490,13 +492,15 @@ const en: typeof fi = {
   mockSeatBot: "Bot",
   mockShareHint: "Share the link — other humans claim empty seats. Bots fill the rest at start.",
   mockStorageMemory:
-    "This room lives in this server process. On Vercel set KV_REST_API_URL + KV_REST_API_TOKEN (or UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN).",
+    "This room lives in this server process. On Vercel you need an Upstash Redis HTTPS REST URL + token. Marketplace may name them UPSTASH_REDIS_REST_KV_REST_API_*.",
   mockRoomMissing: "Room not found.",
   mockSeatTaken: "That seat is taken.",
   mockNotHost: "Only the host can start.",
   mockNotYourTurn: "It's not your turn.",
   mockNotLobby: "The draft has started — seats are locked.",
   mockBusy: "Room is busy. Try again.",
+  mockStorageDown:
+    "Could not create or sync the shared room. Redis or the room API is down — try again.",
   mockHideLastTen: "Hide",
   mockShowLastTen: "Show",
   mockYourTeam: "Your team",
