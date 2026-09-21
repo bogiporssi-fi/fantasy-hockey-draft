@@ -87,6 +87,21 @@ export function parseAveragePick(draftAnalysis: unknown): number | null {
   return null;
 }
 
+/** Yahoo overall rank (`rank_type === "OR"`) from `player_ranks`. */
+export function parseOverallRank(playerRanks: unknown): number | null {
+  for (const item of asArray(playerRanks)) {
+    if (!isRecord(item)) continue;
+    const rank = isRecord(item.player_rank) ? item.player_rank : item;
+    if (String(rank.rank_type ?? "") !== "OR") continue;
+    const raw = rank.rank_value ?? rank.rank;
+    if (raw == null || raw === "" || raw === "-") return null;
+    const n = typeof raw === "number" ? raw : Number.parseInt(String(raw), 10);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return n;
+  }
+  return null;
+}
+
 function locName(value: unknown): { full: string; first: string; last: string } {
   if (typeof value === "string") {
     const parts = value.trim().split(/\s+/);
@@ -115,21 +130,26 @@ export function parseYahooPlayerNode(node: unknown): MockPlayer | null {
   const chunks = asArray(playerWrap);
   const fieldItems: unknown[] = [];
   let draftAnalysis: unknown = null;
+  let playerRanks: unknown = null;
   for (const chunk of chunks) {
     if (Array.isArray(chunk)) {
       fieldItems.push(...chunk);
       continue;
     }
-    if (isRecord(chunk) && "draft_analysis" in chunk) {
-      draftAnalysis = chunk.draft_analysis;
+    if (isRecord(chunk) && ("draft_analysis" in chunk || "player_ranks" in chunk)) {
+      if ("draft_analysis" in chunk) draftAnalysis = chunk.draft_analysis;
+      if ("player_ranks" in chunk) playerRanks = chunk.player_ranks;
       const rest = { ...chunk };
       delete rest.draft_analysis;
+      delete rest.player_ranks;
       if (Object.keys(rest).length) fieldItems.push(rest);
       continue;
     }
     fieldItems.push(chunk);
   }
   const fields = mergeYahooMaps(fieldItems);
+  if (draftAnalysis == null && "draft_analysis" in fields) draftAnalysis = fields.draft_analysis;
+  if (playerRanks == null && "player_ranks" in fields) playerRanks = fields.player_ranks;
   const id = String(fields.player_id ?? "").trim();
   const name = locName(fields.name);
   if (!id || !name.full) return null;
@@ -149,6 +169,7 @@ export function parseYahooPlayerNode(node: unknown): MockPlayer | null {
     displayPosition: displayPosition || positions.join("/"),
     positions,
     adp: parseAveragePick(draftAnalysis),
+    yahooRank: parseOverallRank(playerRanks),
     headshot: parseHeadshot(fields.headshot) ?? parseHeadshot(fields.image_url),
   };
 }
@@ -208,7 +229,7 @@ export async function loadYahooPlayers(): Promise<YahooPlayersPayload> {
   for (let start = 0; players.length < YAHOO_TARGET_POOL; start += YAHOO_PAGE_SIZE) {
     const url =
       `${YAHOO_PUB}/game/${encodeURIComponent(gameKey)}` +
-      `/players;start=${start};count=${YAHOO_PAGE_SIZE};sort=rank_season;out=draft_analysis?format=json`;
+      `/players;start=${start};count=${YAHOO_PAGE_SIZE};sort=rank_season;out=draft_analysis,ranks?format=json`;
     const pageJson = await yahooFetch(url);
     const page = parseYahooPlayersPage(pageJson);
     if (page.length === 0) break;
