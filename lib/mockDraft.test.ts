@@ -329,14 +329,17 @@ describe("roster-by-team view model", () => {
 });
 
 describe("yahoo rank sort", () => {
-  it("sorts by YR with missing ranks last, independently of ADP", () => {
+  it("defaults to ADP, sorts by Yahoo-rank independently, and puts missing values last", () => {
     const pool = [
       player("a", "High Adp Low Rank", ["C"], 20, 2),
       player("b", "Low Adp High Rank", ["C"], 1.5, 10),
       player("c", "No Rank", ["C"], 3, null),
+      player("d", "No Adp", ["C"], null, 4),
     ];
-    expect(sortPlayers(pool, "yahooRank").map((p) => p.id)).toEqual(["a", "b", "c"]);
-    expect(sortPlayers(pool, "adp").map((p) => p.id)).toEqual(["b", "c", "a"]);
+    expect(sortPlayers(pool).map((p) => p.id)).toEqual(["b", "c", "a", "d"]);
+    expect(sortPlayers(pool, "adp").map((p) => p.id)).toEqual(["b", "c", "a", "d"]);
+    expect(sortPlayers(pool, "yahooRank").map((p) => p.id)).toEqual(["a", "d", "b", "c"]);
     expect(compareYahooRank(pool[2], pool[0])).toBeGreaterThan(0);
+    expect(compareAdp(pool[3], pool[0])).toBeGreaterThan(0);
   });
 });

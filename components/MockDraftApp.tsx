@@ -1107,7 +1107,7 @@ function PlayerPicker({
         className="min-h-11 w-full rounded-lg border border-ice/35 bg-[#08141d] px-3 text-sm text-white outline-none placeholder:text-muted/80 focus:border-ice/70"
         aria-label={c.mockSearchPlayers}
       />
-      <div className="mt-2 flex flex-wrap items-center gap-1">
+      <div className="mt-2 flex flex-wrap gap-1" role="group" aria-label={c.mockFilterAll}>
         {FILTERS.map((f) => (
           <button
             key={f}
@@ -1122,29 +1122,55 @@ function PlayerPicker({
             {f === "ALL" ? c.mockFilterAll : f}
           </button>
         ))}
-        <span className="ml-auto text-[10px] uppercase tracking-wide text-muted">{c.mockSortBy}</span>
+      </div>
+      <div className="mt-2">
+        <p id="mock-sort-label" className="mb-1 text-xs text-muted">
+          {c.mockSortBy}
+        </p>
+        <div
+          className="grid grid-cols-2 overflow-hidden rounded-lg border border-line"
+          role="radiogroup"
+          aria-labelledby="mock-sort-label"
+        >
+          <button
+            type="button"
+            role="radio"
+            aria-checked={sortKey === "adp"}
+            onClick={() => onSort("adp")}
+            className={`min-h-11 border-r border-line text-sm font-medium ${
+              sortKey === "adp" ? "bg-ice/20 text-ice" : "text-muted hover:text-white"
+            }`}
+          >
+            {c.mockAdp}
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={sortKey === "yahooRank"}
+            onClick={() => onSort("yahooRank")}
+            className={`min-h-11 text-sm font-medium ${
+              sortKey === "yahooRank" ? "bg-ice/20 text-ice" : "text-muted hover:text-white"
+            }`}
+          >
+            {c.mockYahooRankLong}
+          </button>
+        </div>
+      </div>
+      <div className="mt-2 flex gap-2 px-1 text-[10px] uppercase tracking-wide text-muted">
         <button
           type="button"
           onClick={() => onSort("adp")}
-          className={`min-h-9 rounded-md border px-2.5 text-xs ${
-            sortKey === "adp" ? "border-ice bg-ice/20 text-ice" : "border-line text-muted"
-          }`}
+          className={`w-12 shrink-0 text-left ${sortKey === "adp" ? "text-ice" : ""}`}
         >
           {c.mockAdp}
         </button>
         <button
           type="button"
           onClick={() => onSort("yahooRank")}
-          className={`min-h-9 rounded-md border px-2.5 text-xs ${
-            sortKey === "yahooRank" ? "border-ice bg-ice/20 text-ice" : "border-line text-muted"
-          }`}
+          className={`w-10 shrink-0 text-left ${sortKey === "yahooRank" ? "text-ice" : ""}`}
         >
-          {c.mockYahooRankLong}
+          {c.mockYahooRank}
         </button>
-      </div>
-      <div className="mt-2 flex gap-2 px-1 text-[10px] uppercase tracking-wide text-muted">
-        <span className="w-12 shrink-0">{c.mockAdp}</span>
-        <span className="w-8 shrink-0">{c.mockYahooRank}</span>
         <span className="flex-1">{c.players}</span>
       </div>
       <ul className="mt-1 max-h-[min(24rem,50vh)] overflow-auto">
