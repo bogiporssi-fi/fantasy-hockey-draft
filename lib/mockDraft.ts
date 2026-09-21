@@ -1,3 +1,4 @@
+import { formatEligibility, orderedPositions } from "./positions";
 import { FANTASY_POSITIONS, type FantasyPosition } from "./types";
 
 export const MOCK_TEAM_COUNT = 20;
@@ -40,6 +41,27 @@ export interface MockPlayer {
 }
 
 export type MockSortKey = "adp" | "yahooRank";
+export type MockPosFilter = FantasyPosition | "ALL" | "FD";
+
+/** Sticky strip: C,C,LW,LW,RW,RW,D,D,D,D,G,G + BN×4. */
+export const ROSTER_STRIP_SLOTS: MockSlot[] = [
+  "C",
+  "C",
+  "LW",
+  "LW",
+  "RW",
+  "RW",
+  "D",
+  "D",
+  "D",
+  "D",
+  "G",
+  "G",
+  "BN",
+  "BN",
+  "BN",
+  "BN",
+];
 
 export interface RosterPick {
   playerId: string;
@@ -217,6 +239,90 @@ export function sortByAdp(players: MockPlayer[]): MockPlayer[] {
 
 export function sortPlayers(players: MockPlayer[], key: MockSortKey = "adp"): MockPlayer[] {
   return [...players].sort(key === "yahooRank" ? compareYahooRank : compareAdp);
+}
+
+export function matchesPosFilter(player: MockPlayer, filter: MockPosFilter): boolean {
+  if (filter === "ALL") return true;
+  if (filter === "FD") return player.positions.some((p) => p !== "G");
+  return player.positions.includes(filter);
+}
+
+/** List name: "Z. WERENSKI". */
+export function formatShortName(player: Pick<MockPlayer, "firstName" | "lastName" | "name">): string {
+  const last = (player.lastName || player.name).trim().toUpperCase();
+  const first = (player.firstName || "").trim();
+  const initial = first.charAt(0).toUpperCase();
+  return initial ? `${initial}. ${last}` : last;
+}
+
+/** Subline: "C • EDM" or "C,LW • NJ". */
+export function formatPosTeam(player: Pick<MockPlayer, "positions" | "team">): string {
+  const pos = orderedPositions(player.positions).join(",");
+  const team = player.team.trim();
+  if (!pos) return team;
+  return team ? `${pos} • ${team}` : pos;
+}
+
+/** Own-roster line: "Elias Pettersson, VAN, C/LW". */
+export function formatDraftedLabel(player: Pick<MockPlayer, "name" | "team" | "positions">): string {
+  const parts: string[] = [];
+  const name = player.name.trim();
+  if (name) parts.push(name);
+  const team = player.team.trim();
+  if (team) parts.push(team);
+  const pos = formatEligibility(player.positions);
+  if (pos) parts.push(pos);
+  return parts.join(", ");
+}
+
+/** Ticker: "A. MATTHEWS (C • TOR)". */
+export function formatLastPickTicker(
+  player: Pick<MockPlayer, "firstName" | "lastName" | "name" | "positions" | "team">,
+): string {
+  return `${formatShortName(player)} (${formatPosTeam(player)})`;
+}
+
+/** Picks until this seat is on the clock (0 = now). -1 if the seat is unknown. */
+export function picksUntilTurn(
+  pickIndex: number,
+  userIndex: number | null,
+  teamCount: number = MOCK_TEAM_COUNT,
+): number {
+  if (userIndex == null || userIndex < 0 || userIndex >= teamCount) return -1;
+  const horizon = teamCount * 2;
+  for (let i = 0; i < horizon; i++) {
+    if (snakeTeamIndex(pickIndex + i, teamCount) === userIndex) return i;
+  }
+  return -1;
+}
+
+/** Board cell label: round.pickInRound, e.g. 1.1 or 2.20 (snake). */
+export function boardCellLabel(
+  teamIndex: number,
+  roundZero: number,
+  teamCount: number = MOCK_TEAM_COUNT,
+): string {
+  const round = roundZero + 1;
+  const pickInRound = roundZero % 2 === 0 ? teamIndex + 1 : teamCount - teamIndex;
+  return `${round}.${pickInRound}`;
+}
+
+export function stripSlotsFromRoster(
+  roster: TeamRoster,
+  playersById: Map<string, MockPlayer>,
+  slots: MockSlot[] = ROSTER_STRIP_SLOTS,
+): Array<{ slot: MockSlot; player: MockPlayer | null; pickIndex: number | null }> {
+  const remaining = [...roster.picks];
+  return slots.map((slot) => {
+    const idx = remaining.findIndex((p) => p.slot === slot);
+    if (idx < 0) return { slot, player: null, pickIndex: null };
+    const [pick] = remaining.splice(idx, 1);
+    return {
+      slot,
+      player: playersById.get(pick.playerId) ?? null,
+      pickIndex: pick.pickIndex,
+    };
+  });
 }
 
 /** Most recent first. Accepts a compact pick list or a sparse board. */
