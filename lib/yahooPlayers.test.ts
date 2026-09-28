@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   EXPECTED_NHL_GAME_KEY,
   extractGameKey,
+  loadYahooInjuryIndex,
   loadYahooPlayers,
   parseAveragePick,
   parseEligiblePositions,
   parseOverallRank,
+  parseYahooPlayerNode,
   parseYahooPlayersPage,
   YAHOO_MIN_POOL,
 } from "./yahooPlayers";
@@ -117,6 +119,48 @@ describe("Yahoo player JSON parsing", () => {
       positions: ["C", "LW"],
       adp: 5.8,
     });
+    expect(players[0].injury).toBeNull();
+  });
+
+  it("keeps injured players and reads IR-NR / DTD status", () => {
+    const jarvis = parseYahooPlayerNode({
+      player: [
+        [
+          { player_id: "8653" },
+          { name: { full: "Seth Jarvis", first: "Seth", last: "Jarvis" } },
+          { editorial_team_abbr: "CAR" },
+          { display_position: "LW,RW" },
+          { eligible_positions: [{ position: "LW" }, { position: "RW" }] },
+          { status: "IR-NR" },
+          { status_full: "Injured Reserve" },
+          { injury_note: "Shoulder" },
+        ],
+      ],
+    });
+    const barzal = parseYahooPlayerNode({
+      player: [
+        [
+          { player_id: "6758" },
+          { name: { full: "Mathew Barzal", first: "Mathew", last: "Barzal" } },
+          { editorial_team_abbr: "NYI" },
+          { display_position: "C,RW" },
+          { eligible_positions: [{ position: "C" }, { position: "RW" }] },
+          { status: "DTD" },
+          { injury_note: "Knee" },
+        ],
+      ],
+    });
+    expect(jarvis).toMatchObject({
+      id: "8653",
+      team: "CAR",
+      positions: ["LW", "RW"],
+      injury: { code: "IR-NR", note: "Shoulder" },
+    });
+    expect(barzal).toMatchObject({
+      id: "6758",
+      team: "NYI",
+      injury: { code: "DTD", note: "Knee" },
+    });
   });
 
   it("parses eligible positions and missing ADP", () => {
@@ -211,6 +255,87 @@ describe("loadYahooPlayers pagination", () => {
     expect(payload.players.length).toBeGreaterThanOrEqual(YAHOO_MIN_POOL);
     expect(payload.players[0].name).toBe("P0");
     expect(new Set(payload.players.map((p) => p.id)).size).toBe(payload.players.length);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("Yahoo injury index", () => {
+  it("keeps listed injuries, drops healthy players, and maps LA to LAK", async () => {
+    function row(
+      id: string,
+      name: string,
+      team: string,
+      pos: string,
+      status: string | null,
+      note: string | null,
+    ) {
+      const fields: Record<string, unknown>[] = [
+        { player_id: id },
+        {
+          name: {
+            full: name,
+            first: name.split(" ")[0],
+            last: name.split(" ").slice(1).join(" "),
+          },
+        },
+        { editorial_team_abbr: team },
+        { display_position: pos },
+        { eligible_positions: [{ position: pos }] },
+      ];
+      if (status) fields.push({ status });
+      if (note) fields.push({ injury_note: note });
+      return { player: [fields] };
+    }
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const href = String(url);
+        if (href.includes("/game/nhl")) {
+          return {
+            ok: true,
+            json: async () => ({
+              fantasy_content: { game: [{ game_key: "477", season: "2026" }] },
+            }),
+          };
+        }
+        const start = Number(href.match(/start=(\d+)/)?.[1] ?? 0);
+        if (start > 0) {
+          return {
+            ok: true,
+            json: async () => ({
+              fantasy_content: { game: [{ game_key: "477" }, { players: { count: 0 } }] },
+            }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            fantasy_content: {
+              game: [
+                { game_key: "477" },
+                {
+                  players: {
+                    count: 4,
+                    "0": row("8653", "Seth Jarvis", "CAR", "RW", "IR-NR", "Shoulder"),
+                    "1": row("6758", "Mathew Barzal", "NYI", "C", "DTD", "Knee"),
+                    "2": row("6743", "Connor McDavid", "EDM", "C", null, null),
+                    "3": row("7001", "Kevin Fiala", "LA", "LW", "IR", "Lower Leg"),
+                  },
+                },
+              ],
+            },
+          }),
+        };
+      }),
+    );
+
+    const rows = await loadYahooInjuryIndex();
+    expect(rows).toEqual([
+      { name: "Seth Jarvis", team: "CAR", injury: { code: "IR-NR", note: "Shoulder" } },
+      { name: "Mathew Barzal", team: "NYI", injury: { code: "DTD", note: "Knee" } },
+      { name: "Kevin Fiala", team: "LAK", injury: { code: "IR", note: "Lower Leg" } },
+    ]);
     vi.unstubAllGlobals();
   });
 });

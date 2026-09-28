@@ -1,6 +1,6 @@
 "use client";
 
-import { MiniGames } from "./PlayerBits";
+import { InjuryBadge, MiniGames } from "./PlayerBits";
 import { PlayerSearch } from "./PlayerSearch";
 import { YahooEligibilityBox } from "./YahooPositionSheet";
 import { LuckPanel } from "./LuckPanel";
@@ -108,7 +108,10 @@ export function CompareTray({
                         onClick={() => onFocus(entry.id)}
                         className="min-w-0 flex-1 text-left"
                       >
-                        <div className="truncate text-sm font-medium text-white">{name}</div>
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="truncate text-sm font-medium text-white">{name}</span>
+                          <InjuryBadge lang={lang} injury={entry.player?.injury} />
+                        </div>
                         <div className="font-mono text-[11px] text-ice/80">
                           {entry.player?.team ?? "?"} · {formatEligibility(entry.positions)}
                           {isBest && (

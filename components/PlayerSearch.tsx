@@ -1,5 +1,6 @@
 "use client";
 
+import { InjuryBadge } from "@/components/PlayerBits";
 import { searchPlayers } from "@/lib/names";
 import { t } from "@/lib/i18n";
 import type { Lang, NhlPlayer } from "@/lib/types";
@@ -100,9 +101,10 @@ export function PlayerSearch({
                   <span className="w-8 shrink-0 font-mono text-[11px] text-ice/80">
                     {p.team}
                   </span>
-                  <span className="flex-1 truncate">
-                    {p.fullName}
-                    <span className="ml-2 text-[11px] text-muted">{p.position}</span>
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <span className="truncate">{p.fullName}</span>
+                    <InjuryBadge lang={lang} injury={p.injury} />
+                    <span className="shrink-0 text-[11px] text-muted">{p.position}</span>
                   </span>
                   {excluded && (
                     <span className="text-[10px] uppercase tracking-wide text-muted">

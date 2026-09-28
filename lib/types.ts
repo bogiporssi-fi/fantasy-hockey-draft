@@ -20,6 +20,16 @@ export interface NhlGame {
   home: boolean;
 }
 
+/** Yahoo fantasy status codes. NA is parsed but not shown or used to fill roster gaps. */
+export const INJURY_CODES = ["IR", "IR-LT", "IR-NR", "DTD", "O", "NA"] as const;
+export type InjuryCode = (typeof INJURY_CODES)[number];
+
+export interface PlayerInjury {
+  code: InjuryCode;
+  /** Yahoo `injury_note` as published, e.g. "Shoulder". */
+  note: string | null;
+}
+
 export interface NhlPlayer {
   id: number;
   firstName: string;
@@ -30,6 +40,8 @@ export interface NhlPlayer {
   position: FantasyPosition;
   headshot: string | null;
   sweaterNumber: number | null;
+  /** Missing on older payloads. Null means no listed injury. */
+  injury?: PlayerInjury | null;
 }
 
 export interface NhlPayload {
