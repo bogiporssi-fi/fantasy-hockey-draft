@@ -1,10 +1,16 @@
+import { isLongTermIr } from "./injury";
 import { formatEligibility, orderedPositions } from "./positions";
-import { FANTASY_POSITIONS, type FantasyPosition } from "./types";
+import { FANTASY_POSITIONS, type FantasyPosition, type PlayerInjury } from "./types";
 
 export const MOCK_TEAM_COUNT = 20;
 export const MOCK_ROUNDS = 16;
 export const MOCK_TOTAL_PICKS = MOCK_TEAM_COUNT * MOCK_ROUNDS;
 export const BOT_TOP_N = 3;
+/**
+ * Bots treat long-term IR (IR, IR-LT, IR-NR) as a few ADP spots worse.
+ * Day-to-day and Out keep their real ADP. The player stays pickable.
+ */
+export const LONG_TERM_IR_ADP_PENALTY = 5;
 
 export type MockSlot = FantasyPosition | "BN";
 
@@ -38,6 +44,7 @@ export interface MockPlayer {
   adp: number | null;
   yahooRank: number | null;
   headshot?: string | null;
+  injury?: PlayerInjury | null;
 }
 
 export type MockSortKey = "adp" | "yahooRank";
@@ -237,6 +244,17 @@ export function sortByAdp(players: MockPlayer[]): MockPlayer[] {
   return [...players].sort(compareAdp);
 }
 
+/** ADP used only by bots. User-facing sorts keep the published ADP. */
+export function botDraftAdp(player: MockPlayer): number | null {
+  if (player.adp == null || !Number.isFinite(player.adp)) return null;
+  if (!isLongTermIr(player.injury?.code)) return player.adp;
+  return player.adp + LONG_TERM_IR_ADP_PENALTY;
+}
+
+export function compareBotAdp(a: MockPlayer, b: MockPlayer): number {
+  return compareNullableAsc(botDraftAdp(a), botDraftAdp(b), a.name, b.name);
+}
+
 export function sortPlayers(players: MockPlayer[], key: MockSortKey = "adp"): MockPlayer[] {
   return [...players].sort(key === "yahooRank" ? compareYahooRank : compareAdp);
 }
@@ -413,12 +431,12 @@ export function remainingFromPicks(pool: MockPlayer[], picks: MockDraftPickRecor
   return pool.filter((p) => !taken.has(p.id));
 }
 
-/** ADP-sorted players that fill an open starter, else BN-eligible players. */
+/** Bot candidates: real ADP, with long-term IR nudged down by LONG_TERM_IR_ADP_PENALTY. */
 export function needAwareCandidates(
   remainingPlayers: MockPlayer[],
   remaining: MockSlotCounts,
 ): MockPlayer[] {
-  const sorted = sortByAdp(remainingPlayers);
+  const sorted = [...remainingPlayers].sort(compareBotAdp);
   const starters = sorted.filter((p) => canFillStarter(p.positions, remaining));
   if (starters.length > 0) return starters;
   return sorted.filter((p) => assignSlot(p.positions, remaining) === "BN");

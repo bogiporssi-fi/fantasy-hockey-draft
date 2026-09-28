@@ -1,3 +1,5 @@
+import { isListedInjury, parseInjuryStatus, yahooTeamToNhl } from "./injury";
+import type { InjuryIndexEntry } from "./rosterPool";
 import { FANTASY_POSITIONS, type FantasyPosition } from "./types";
 import type { MockPlayer } from "./mockDraft";
 
@@ -6,6 +8,8 @@ export const EXPECTED_NHL_GAME_KEY = "477";
 export const YAHOO_PAGE_SIZE = 25;
 export const YAHOO_MIN_POOL = 400;
 export const YAHOO_TARGET_POOL = 500;
+/** Stay under Next's 2MB fetch-cache limit (count=400 is ~2.3MB). */
+export const YAHOO_INJURY_PAGE_SIZE = 200;
 export const YAHOO_REVALIDATE_SECONDS = 86400;
 
 export interface YahooPlayersPayload {
@@ -171,6 +175,7 @@ export function parseYahooPlayerNode(node: unknown): MockPlayer | null {
     adp: parseAveragePick(draftAnalysis),
     yahooRank: parseOverallRank(playerRanks),
     headshot: parseHeadshot(fields.headshot) ?? parseHeadshot(fields.image_url),
+    injury: parseInjuryStatus(fields.status, fields.injury_note),
   };
 }
 
@@ -251,4 +256,36 @@ export async function loadYahooPlayers(): Promise<YahooPlayersPayload> {
     fetchedAt: new Date().toISOString(),
     players,
   };
+}
+
+/**
+ * Name, NHL team, and listed injury for the whole Yahoo player pool.
+ * Used to badge the NHL roster and to add IR/DTD/Out players missing from `/roster/current`.
+ * Ranking pages stay separate so the mock draft pool does not grow past its ADP cap.
+ */
+export async function loadYahooInjuryIndex(): Promise<InjuryIndexEntry[]> {
+  const gameJson = await yahooFetch(`${YAHOO_PUB}/game/nhl?format=json`);
+  const meta = extractGameKey(gameJson);
+  if (!meta) return [];
+  const rows: InjuryIndexEntry[] = [];
+  const seen = new Set<string>();
+  for (let start = 0; start < 8000; start += YAHOO_INJURY_PAGE_SIZE) {
+    const url =
+      `${YAHOO_PUB}/game/${encodeURIComponent(meta.gameKey)}` +
+      `/players;start=${start};count=${YAHOO_INJURY_PAGE_SIZE};sort=rank_season?format=json`;
+    const page = parseYahooPlayersPage(await yahooFetch(url));
+    if (page.length === 0) break;
+    for (const player of page) {
+      if (!player.injury || !isListedInjury(player.injury.code)) continue;
+      if (seen.has(player.id)) continue;
+      seen.add(player.id);
+      rows.push({
+        name: player.name,
+        team: yahooTeamToNhl(player.team),
+        injury: player.injury,
+      });
+    }
+    if (page.length < YAHOO_INJURY_PAGE_SIZE) break;
+  }
+  return rows;
 }

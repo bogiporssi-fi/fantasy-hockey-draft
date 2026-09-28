@@ -39,6 +39,14 @@ const fi = {
   addCandidate: "Valitse ehdokkaaksi",
   remove: "Poista",
   onRoster: "Kokoonpanossa",
+  injuryIR: "IR",
+  injuryIRLT: "IR-LT",
+  injuryDTD: "DTD",
+  injuryOut: "OUT",
+  injuryIRHint: "Loukkaantuneiden lista",
+  injuryIRLTHint: "Pitkäaikainen IR",
+  injuryDTDHint: "Päivästä päivään",
+  injuryOutHint: "Sivussa",
   paste: "Liitä nimet",
   pasteTitle: "Liitä pelaajalista",
   pasteHelp:
@@ -83,7 +91,8 @@ const fi = {
   howTitle: "Miten laskenta toimii",
   howBody:
     "Jokainen otteluilta: nykyinen kokoonpano täyttää aktiivipaikat ahneesti (kapeampi merkitty Yahoo-kelpoisuus ensin). Pelaaja saa aktiivi-illan vain sille paikalle, jonka merkkasit (C / LW / RW / D / G) — LW-merkintä ei koskaan vie C-paikkaa. UTIL-paikkaan vain, jos kimpassa on UTIL. Ehdokas on hyödyllinen vain jos tällainen paikka on vielä auki. Penkki-ilta = ottelu, kun merkittyjä paikkoja ei jää. Ei Yahoo-kirjautumista, ei pistemääräennusteita.",
-  dataSource: "Otteluohjelma ja pelaajat: NHL Web API (api-web.nhle.com), ei keksittyjä otteluita.",
+  dataSource:
+    "Otteluohjelma: NHL Web API. Pelaajat: aktiivirosteri plus loukkaantuneet (IR, DTD, sivussa), jotka puuttuvat sieltä. Ei keksittyjä otteluita.",
   savedLocal: "Kimpat ja kokoonpano tallentuvat tähän selaimeen.",
   legendUseful: "Mahtuu avoimeen paikkaan",
   legendBench: "Paikat täynnä → penkki",
@@ -196,7 +205,8 @@ const fi = {
   mockDraftBoard: "Draft-taulu",
   mockPickPlayer: "Valitse",
   mockSearchPlayers: "Hae pelaajaa",
-  mockDataSource: "Pelaajat, ADP ja Yahoo-rank: Yahoon julkinen fantasy-API (ei kirjautumista). Ei keksittyjä pelaajia.",
+  mockDataSource:
+    "Pelaajat, ADP, Yahoo-rank ja loukkaantumismerkki: Yahoon julkinen fantasy-API (ei kirjautumista). Ei keksittyjä pelaajia.",
   mockLastPick: "Viimeisin",
   mockEmptyList: "Ei pelaajia tällä suodattimella.",
   mockNoFit: "ei mahdu",
@@ -308,6 +318,14 @@ const en: typeof fi = {
   addCandidate: "Set as candidate",
   remove: "Remove",
   onRoster: "On roster",
+  injuryIR: "IR",
+  injuryIRLT: "IR-LT",
+  injuryDTD: "DTD",
+  injuryOut: "OUT",
+  injuryIRHint: "Injured reserve",
+  injuryIRLTHint: "Long-term injured reserve",
+  injuryDTDHint: "Day-to-day",
+  injuryOutHint: "Out",
   paste: "Paste names",
   pasteTitle: "Paste player list",
   pasteHelp:
@@ -352,7 +370,8 @@ const en: typeof fi = {
   howTitle: "How scoring works",
   howBody:
     "Each game night: the current roster fills active slots greedily (narrower marked Yahoo eligibility first). A player is started only in a slot they marked (C/LW/RW/D/G) — LW-only never takes C. UTIL only if the league still has UTIL. A candidate is useful only if such a slot is still open. Bench night = they play when marked slots are already full. No Yahoo login, no category projections.",
-  dataSource: "Schedule and players from the NHL Web API (api-web.nhle.com). No invented games.",
+  dataSource:
+    "Schedule: NHL Web API. Players: active roster plus injured players (IR, DTD, out) missing from it. No invented games.",
   savedLocal: "League profiles and roster are saved in this browser.",
   legendUseful: "Fits an open slot",
   legendBench: "Slots full → bench",
@@ -465,7 +484,8 @@ const en: typeof fi = {
   mockDraftBoard: "Draft board",
   mockPickPlayer: "Pick",
   mockSearchPlayers: "Search player",
-  mockDataSource: "Players, ADP and Yahoo rank from Yahoo’s public fantasy API (no login). No invented players.",
+  mockDataSource:
+    "Players, ADP, Yahoo rank and injury badges from Yahoo’s public fantasy API (no login). No invented players.",
   mockLastPick: "Latest",
   mockEmptyList: "No players match this filter.",
   mockNoFit: "no slot",

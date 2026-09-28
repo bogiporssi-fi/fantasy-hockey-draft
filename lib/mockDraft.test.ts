@@ -8,6 +8,7 @@ import {
   chooseBotPick,
   compareAdp,
   compareYahooRank,
+  LONG_TERM_IR_ADP_PENALTY,
   createEmptyRosters,
   formatDraftedLabel,
   formatLastPickTicker,
@@ -187,6 +188,37 @@ describe("bot pick", () => {
     expect(weightedIndex(3, () => 0)).toBe(0);
     expect(weightedIndex(3, () => 0.9999)).toBe(2);
     expect(weightedIndex(1, () => 0.5)).toBe(0);
+  });
+
+  it("slightly deprioritizes long-term IR and can still pick them", () => {
+    const rem = remainingSlots(filled({}));
+    const jarvis = {
+      ...player("j", "Seth Jarvis", ["RW"], 4),
+      team: "CAR",
+      injury: { code: "IR-NR" as const, note: "Shoulder" },
+    };
+    const healthy = player("h", "Healthy Skater", ["C"], 8);
+    expect(LONG_TERM_IR_ADP_PENALTY).toBeGreaterThan(0);
+    expect(chooseBotPick([jarvis, healthy], rem, () => 0)?.id).toBe("h");
+    expect(sortByAdp([jarvis, healthy]).map((p) => p.id)).toEqual(["j", "h"]);
+    expect(sortPlayers([jarvis, healthy], "adp").map((p) => p.id)).toEqual(["j", "h"]);
+
+    const late = player("late", "Late Healthy", ["C"], 30);
+    expect(chooseBotPick([jarvis, late], rem, () => 0)?.id).toBe("j");
+
+    const onlyGoalie = {
+      ...player("g", "Thatcher Demko", ["G"], 12),
+      injury: { code: "IR" as const, note: "Hip" },
+    };
+    expect(chooseBotPick([onlyGoalie], rem, () => 0)?.id).toBe("g");
+
+    const barzal = {
+      ...player("b", "Mathew Barzal", ["C"], 6),
+      team: "NYI",
+      injury: { code: "DTD" as const, note: "Knee" },
+    };
+    const other = player("o", "Other Center", ["C"], 8);
+    expect(chooseBotPick([barzal, other], rem, () => 0)?.id).toBe("b");
   });
 });
 

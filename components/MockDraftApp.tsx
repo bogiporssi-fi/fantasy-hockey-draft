@@ -1,6 +1,8 @@
 "use client";
 
 import { LuistinLogo } from "@/components/AppNav";
+import { InjuryBadge } from "@/components/PlayerBits";
+import { injuryBadgeMeta } from "@/lib/injury";
 import { useStableListScroll } from "@/components/useStableListScroll";
 import { t, type Copy } from "@/lib/i18n";
 import {
@@ -121,6 +123,13 @@ function formatAdp(adp: number | null, lang: Lang): string {
 function formatRank(rank: number | null): string {
   if (rank == null || !Number.isFinite(rank)) return "—";
   return String(Math.round(rank));
+}
+
+function injuryTitle(c: Copy, injury: MockPlayer["injury"]): string {
+  const meta = injuryBadgeMeta(injury?.code);
+  if (!injury || !meta) return "";
+  const hint = injury.note ? `${c[meta.hint]} (${injury.note})` : c[meta.hint];
+  return ` · ${c[meta.label]} ${hint}`;
 }
 
 function formatElapsed(seconds: number): string {
@@ -1128,9 +1137,12 @@ function DraftRoom({
 
       {lastPick && (
         <div className="mx-3 mb-1 flex items-center justify-between rounded-full bg-zinc-100 px-3 py-1.5 text-[11px]">
-          <p className="min-w-0 truncate font-medium text-zinc-800">
-            <span className="text-zinc-500">{c.mockLastPrefix} </span>
-            {formatLastPickTicker(lastPick.player)}
+          <p className="flex min-w-0 items-center gap-1.5 font-medium text-zinc-800">
+            <span className="truncate">
+              <span className="text-zinc-500">{c.mockLastPrefix} </span>
+              {formatLastPickTicker(lastPick.player)}
+            </span>
+            <InjuryBadge lang={appLang} injury={lastPick.player.injury} size="sm" />
           </p>
           <span className="ml-2 shrink-0 text-zinc-500">
             {seatLabel(c, lastPick.teamIndex, userIndex)}
@@ -1441,8 +1453,11 @@ function PlayersTab({
                       )}
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-bold text-zinc-900">
-                        {formatShortName(p)}
+                      <span className="flex min-w-0 items-center gap-1">
+                        <span className="truncate text-sm font-bold text-zinc-900">
+                          {formatShortName(p)}
+                        </span>
+                        <InjuryBadge lang={lang} injury={p.injury} size="sm" />
                       </span>
                       <span className="block truncate text-[11px] text-[var(--mock-teal)]">
                         {formatPosTeam(p)}
@@ -1514,7 +1529,10 @@ function QueueTab({
             </button>
             <Headshot player={p} size={36} />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold">{formatShortName(p)}</p>
+              <p className="flex min-w-0 items-center gap-1">
+                <span className="truncate text-sm font-bold">{formatShortName(p)}</span>
+                <InjuryBadge lang={lang} injury={p.injury} size="sm" />
+              </p>
               <p className="truncate text-[11px] text-[var(--mock-teal)]">{formatPosTeam(p)}</p>
             </div>
             <span className="w-10 text-right text-sm tabular">{formatRank(p.yahooRank)}</span>
@@ -1601,7 +1619,10 @@ function BoardTab({
                   )}
                   {pick ? (
                     <>
-                      <p className="truncate font-semibold text-zinc-900">{pick.player.lastName}</p>
+                      <p className="flex min-w-0 items-center gap-0.5 font-semibold text-zinc-900">
+                        <span className="truncate">{pick.player.lastName}</span>
+                        <InjuryBadge lang={lang} injury={pick.player.injury} size="sm" />
+                      </p>
                       <p className="text-[var(--mock-teal)]">{formatPosTeam(pick.player)}</p>
                     </>
                   ) : (
@@ -1734,8 +1755,9 @@ function ResultsTab({
                 className="grid grid-cols-[3rem_1fr_3rem] items-center border-b border-zinc-100 px-4 py-2.5"
               >
                 <SlotBadge slot={row.slot} />
-                <p className="min-w-0 truncate text-sm text-zinc-900">
-                  {row.player ? formatDraftedLabel(row.player) : ""}
+                <p className="flex min-w-0 items-center gap-1 text-sm text-zinc-900">
+                  <span className="truncate">{row.player ? formatDraftedLabel(row.player) : ""}</span>
+                  {row.player && <InjuryBadge lang={lang} injury={row.player.injury} size="sm" />}
                 </p>
                 <span className="text-right text-xs tabular text-zinc-400">
                   {row.pickIndex != null ? row.pickIndex + 1 : ""}
@@ -1762,7 +1784,10 @@ function ResultsTab({
               <span className="w-8 shrink-0 text-xs tabular text-zinc-400">#{p.pickIndex + 1}</span>
               <Headshot player={p.player} size={32} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{formatShortName(p.player)}</p>
+                <p className="flex min-w-0 items-center gap-1">
+                  <span className="truncate text-sm font-semibold">{formatShortName(p.player)}</span>
+                  <InjuryBadge lang={lang} injury={p.player.injury} size="sm" />
+                </p>
                 <p className="truncate text-[11px] text-[var(--mock-teal)]">{formatPosTeam(p.player)}</p>
               </div>
               <span className="text-xs text-zinc-500">{seatLabel(c, p.teamIndex, userIndex)}</span>
@@ -1807,7 +1832,13 @@ function RosterStrip({
           <div
             key={`${item.slot}-${i}`}
             className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-200 bg-white"
-            title={item.player ? formatDraftedLabel(item.player) : item.slot === "BN" ? c.mockBenchShort : item.slot}
+            title={
+              item.player
+                ? `${formatDraftedLabel(item.player)}${injuryTitle(c, item.player.injury)}`
+                : item.slot === "BN"
+                  ? c.mockBenchShort
+                  : item.slot
+            }
           >
             {item.player ? (
               <Headshot player={item.player} size={32} />

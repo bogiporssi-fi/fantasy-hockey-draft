@@ -184,6 +184,24 @@ describe("shared snake picks", () => {
     expect(hostPick.value.picks.at(-1)?.by).toBe("human");
   });
 
+  it("lets bot seats draft a long-term IR player after a slight ADP nudge", () => {
+    const started = startRoom(lobby(20), HOST);
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    const players = pool();
+    players[0] = {
+      ...players[0],
+      name: "Seth Jarvis",
+      firstName: "Seth",
+      lastName: "Jarvis",
+      team: "CAR",
+      injury: { code: "IR-NR", note: "Shoulder" },
+    };
+    const room = advanceBots(started.value, players, () => 0);
+    expect(room.picks[0]?.player.id).not.toBe("p0");
+    expect(room.picks.some((p) => p.by === "bot" && p.player.name === "Seth Jarvis")).toBe(true);
+  });
+
   it("fills a full snake when the only human keeps picking and bots fill the rest", () => {
     const started = startRoom(lobby(1), HOST);
     expect(started.ok).toBe(true);

@@ -11,7 +11,7 @@ import type {
   NightOutcome,
   WeekWindow,
 } from "@/lib/types";
-import { MiniGames } from "./PlayerBits";
+import { InjuryBadge, MiniGames } from "./PlayerBits";
 import { YahooEligibilityBox } from "./YahooPositionSheet";
 import { LuckPanel } from "./LuckPanel";
 import type { LuckReport } from "@/lib/luck";
@@ -187,6 +187,7 @@ export function CandidatePanel({
               <div className="flex flex-wrap items-baseline gap-2">
                 <div className="text-lg font-semibold text-white">
                   {player.fullName}{" "}
+                  <InjuryBadge lang={lang} injury={player.injury} />{" "}
                   <span className="font-mono text-sm text-ice/80">
                     {player.team} · {formatEligibility(positions)}
                   </span>

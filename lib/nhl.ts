@@ -1,5 +1,6 @@
-import { nhlToFantasyPosition } from "./names";
-import type { FantasyPosition, NhlGame, NhlPayload, NhlPlayer } from "./types";
+import { buildPlayerPool, type RosterSourcePlayer } from "./rosterPool";
+import { loadYahooInjuryIndex } from "./yahooPlayers";
+import type { NhlGame, NhlPayload } from "./types";
 
 const NHL = "https://api-web.nhle.com";
 const FALLBACK_TEAMS = [
@@ -121,6 +122,46 @@ function seasonLabel(season: number): string {
   return `${s.slice(0, 4)}–${s.slice(6)}`;
 }
 
+/** NHL season id (20262027) for a calendar date. Rolls over in August, matching the previous fallback. */
+export function seasonIdForDate(date = new Date()): number {
+  const y = date.getFullYear();
+  const month = date.getMonth();
+  const start = month >= 7 ? y : y - 1;
+  return start * 10000 + (start + 1);
+}
+
+export function previousSeasonId(season: number): number {
+  const start = Math.floor(season / 10000) - 1;
+  return start * 10000 + (start + 1);
+}
+
+function rosterSources(roster: RosterResponse | null, team: { abbrev: string; name: string }): RosterSourcePlayer[] {
+  if (!roster) return [];
+  const groups: RosterPlayerRaw[] = [
+    ...(roster.forwards ?? []),
+    ...(roster.defensemen ?? []),
+    ...(roster.goalies ?? []),
+  ];
+  const out: RosterSourcePlayer[] = [];
+  for (const p of groups) {
+    if (!p.id) continue;
+    const firstName = loc(p.firstName);
+    const lastName = loc(p.lastName);
+    if (!firstName && !lastName) continue;
+    out.push({
+      id: p.id,
+      firstName,
+      lastName,
+      positionCode: p.positionCode ?? "C",
+      headshot: p.headshot ?? null,
+      sweaterNumber: p.sweaterNumber ?? null,
+      team: team.abbrev,
+      teamName: team.name,
+    });
+  }
+  return out;
+}
+
 export async function loadNhlData(): Promise<NhlPayload> {
   let teams: { abbrev: string; name: string }[] = FALLBACK_TEAMS.map((abbrev) => ({
     abbrev,
@@ -156,21 +197,27 @@ export async function loadNhlData(): Promise<NhlPayload> {
   const missingTeams: string[] = [];
   let season = 0;
   const teamGames: Record<string, NhlGame[]> = {};
-  const players: NhlPlayer[] = [];
-  const seenPlayers = new Set<number>();
+  const currentPlayers: RosterSourcePlayer[] = [];
+  const previousPlayers: RosterSourcePlayer[] = [];
+  const previousSeason = previousSeasonId(seasonIdForDate());
 
-  const results = await mapPool(teams, 3, async (team) => {
-    const abbrev = team.abbrev;
-    try {
-      const [schedule, roster] = await Promise.all([
-        nhlJson<ScheduleResponse>(`/v1/club-schedule-season/${abbrev}/now`),
-        nhlJson<RosterResponse>(`/v1/roster/${abbrev}/current`),
-      ]);
-      return { abbrev, name: team.name, schedule, roster };
-    } catch {
-      return { abbrev, name: team.name, schedule: null, roster: null };
-    }
-  });
+  const [results, injuries] = await Promise.all([
+    mapPool(teams, 3, async (team) => {
+      const abbrev = team.abbrev;
+      try {
+        const [schedule, roster, previousRoster] = await Promise.all([
+          nhlJson<ScheduleResponse>(`/v1/club-schedule-season/${abbrev}/now`),
+          nhlJson<RosterResponse>(`/v1/roster/${abbrev}/current`),
+          // Active roster omits IR / LTIR. Last season's roster still lists them.
+          nhlJson<RosterResponse>(`/v1/roster/${abbrev}/${previousSeason}`).catch(() => null),
+        ]);
+        return { abbrev, name: team.name, schedule, roster, previousRoster };
+      } catch {
+        return { abbrev, name: team.name, schedule: null, roster: null, previousRoster: null };
+      }
+    }),
+    loadYahooInjuryIndex().catch(() => []),
+  ]);
 
   for (const row of results) {
     if (!row.schedule || !row.roster) {
@@ -193,38 +240,18 @@ export async function loadNhlData(): Promise<NhlPayload> {
       if (!regularSeasonEnd || last > regularSeasonEnd) regularSeasonEnd = last;
     }
 
-    const groups: RosterPlayerRaw[] = [
-      ...(row.roster.forwards ?? []),
-      ...(row.roster.defensemen ?? []),
-      ...(row.roster.goalies ?? []),
-    ];
-    for (const p of groups) {
-      if (!p.id || seenPlayers.has(p.id)) continue;
-      seenPlayers.add(p.id);
-      const firstName = loc(p.firstName);
-      const lastName = loc(p.lastName);
-      const position: FantasyPosition = nhlToFantasyPosition(p.positionCode ?? "C");
-      players.push({
-        id: p.id,
-        firstName,
-        lastName,
-        fullName: `${firstName} ${lastName}`.trim(),
-        team: row.abbrev,
-        teamName: row.name,
-        position,
-        headshot: p.headshot ?? null,
-        sweaterNumber: p.sweaterNumber ?? null,
-      });
-    }
+    currentPlayers.push(...rosterSources(row.roster, { abbrev: row.abbrev, name: row.name }));
+    previousPlayers.push(...rosterSources(row.previousRoster, { abbrev: row.abbrev, name: row.name }));
   }
 
-  players.sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName));
+  const players = buildPlayerPool({
+    current: currentPlayers,
+    previous: previousPlayers,
+    injuries,
+    teamNames: new Map(teams.map((team) => [team.abbrev, team.name])),
+  });
 
-  if (!season) {
-    const y = new Date().getFullYear();
-    const month = new Date().getMonth();
-    season = month >= 7 ? y * 10000 + (y + 1) : (y - 1) * 10000 + y;
-  }
+  if (!season) season = seasonIdForDate();
 
   return {
     season,
