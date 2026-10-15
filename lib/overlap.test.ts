@@ -3,7 +3,7 @@ import { DEFAULT_SLOTS } from "./defaults";
 import { matchPastedPlayers, parsePastedNames, searchPlayers } from "./names";
 import { assignNight, evaluateCandidate, pickSlot } from "./overlap";
 import { formatEligibility, toggleFantasyPosition } from "./positions";
-import type { NhlPlayer, SlotConfig } from "./types";
+import type { FantasyPosition, NhlPlayer, SlotConfig } from "./types";
 import { buildWeeks } from "./weeks";
 
 const twoC: SlotConfig = { ...DEFAULT_SLOTS, C: 2, LW: 0, RW: 0, D: 0, G: 0, UTIL: 0, BN: 4 };
@@ -381,5 +381,156 @@ describe("Yahoo eligibility toggles", () => {
     expect(formatEligibility(["LW", "C"])).toBe("C/LW");
     expect(toggleFantasyPosition(["C"], "C")).toEqual(["C"]);
     expect(toggleFantasyPosition(["C", "LW"], "C")).toEqual(["LW"]);
+  });
+});
+
+function caps(partial: Partial<SlotConfig>): SlotConfig {
+  return { C: 0, LW: 0, RW: 0, D: 0, G: 0, UTIL: 0, BN: 0, ...partial };
+}
+
+/** Independent exhaustive search. Not the production matcher. */
+function bruteStarts(
+  players: { id: string; positions: FantasyPosition[] }[],
+  slots: SlotConfig,
+): number {
+  const order = ["C", "LW", "RW", "D", "G", "UTIL"] as const;
+  const fantasy = new Set(["C", "LW", "RW", "D", "G"]);
+  const cap: Record<(typeof order)[number], number> = {
+    C: 0,
+    LW: 0,
+    RW: 0,
+    D: 0,
+    G: 0,
+    UTIL: 0,
+  };
+  for (const slot of order) {
+    const n = slots[slot];
+    cap[slot] = typeof n === "number" && Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  }
+  const seen = new Set<string>();
+  const unique = players.filter((player) => {
+    if (seen.has(player.id)) return false;
+    seen.add(player.id);
+    return true;
+  });
+  function legal(positions: FantasyPosition[], slot: (typeof order)[number]): boolean {
+    if (slot === "UTIL") return true;
+    return positions.some((pos) => pos === slot && fantasy.has(pos));
+  }
+  function rec(index: number): number {
+    if (index === unique.length) return 0;
+    const player = unique[index];
+    let best = rec(index + 1);
+    for (const slot of order) {
+      if (cap[slot] <= 0 || !legal(player.positions, slot)) continue;
+      cap[slot] -= 1;
+      best = Math.max(best, 1 + rec(index + 1));
+      cap[slot] += 1;
+    }
+    return best;
+  }
+  return rec(0);
+}
+
+describe("maximum matching", () => {
+  const dates = ["2026-10-15", "2026-10-17", "2026-10-20"];
+  const weeks = buildWeeks("2026-10-12", "2026-10-25", 1);
+  const games = dates.map((date) => ({ date, opponent: "EDM", home: true }));
+
+  it("starts MacKinnon at C and moves Hughes C/LW to LW", () => {
+    const slots = caps({ C: 2, LW: 2 });
+    const roster = [
+      { id: "crosby", positions: ["C" as const] },
+      { id: "hughes", positions: ["C" as const, "LW" as const] },
+    ];
+    const candidate = { id: "mack", positions: ["C" as const] };
+    const fill = assignNight([...roster, candidate], slots);
+    expect(fill.started.size).toBe(3);
+    expect(fill.started.get("crosby")).toBe("C");
+    expect(fill.started.get("mack")).toBe("C");
+    expect(fill.started.get("hughes")).toBe("LW");
+
+    const rosterGames = new Map(dates.map(() => ["x", new Set<string>()]));
+    rosterGames.clear();
+    for (const player of roster) rosterGames.set(player.id, new Set(dates));
+    const metrics = evaluateCandidate({
+      slots,
+      roster,
+      rosterGames,
+      candidate,
+      candidateGames: games,
+      weeks,
+    });
+    expect(metrics.usefulStarts).toBe(3);
+    expect(metrics.forcedBenchNights).toBe(0);
+    expect(metrics.nights.every((night) => night.slot === "C" && night.result === "useful")).toBe(true);
+    expect(metrics.byWeek.reduce((sum, week) => sum + week.useful, 0)).toBe(metrics.usefulStarts);
+    expect(metrics.byWeek.reduce((sum, week) => sum + week.bench, 0)).toBe(0);
+    expect(metrics.byWeek.reduce((sum, week) => sum + week.candidateGames, 0)).toBe(3);
+  });
+
+  it("starts 5 on the night greedy assignment left at 4", () => {
+    const slots = caps({ C: 2, LW: 2, RW: 2 });
+    const players = [
+      { id: "p0", positions: ["C" as const] },
+      { id: "p1", positions: ["C" as const] },
+      { id: "p2", positions: ["C" as const] },
+      { id: "p3", positions: ["LW" as const] },
+      { id: "p4", positions: ["LW" as const, "RW" as const] },
+      { id: "p5", positions: ["C" as const, "LW" as const] },
+    ];
+    const fill = assignNight(players, slots);
+    expect(fill.started.size).toBe(5);
+    expect(bruteStarts(players, slots)).toBe(5);
+    expect(fill.started.has("p2")).toBe(false);
+    expect(fill.started.get("p4")).toBe("RW");
+    expect(fill.started.get("p5")).toBe("LW");
+    expect(fill.benched).toEqual(["p2"]);
+  });
+
+  it("matches brute force on random legal lineups", () => {
+    let seed = 0x5eed;
+    const rand = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    };
+    const marks: FantasyPosition[][] = [
+      [],
+      ["C"],
+      ["LW"],
+      ["RW"],
+      ["D"],
+      ["G"],
+      ["C", "LW"],
+      ["LW", "RW"],
+      ["C", "LW", "RW"],
+      ["D", "C"],
+    ];
+    let checked = 0;
+    for (let trial = 0; trial < 40; trial++) {
+      const n = 1 + Math.floor(rand() * 5);
+      const players = Array.from({ length: n }, (_, i) => ({
+        id: `r${i}`,
+        positions: marks[Math.floor(rand() * marks.length)],
+      }));
+      const slots = caps({
+        C: Math.floor(rand() * 2),
+        LW: Math.floor(rand() * 2),
+        RW: Math.floor(rand() * 2),
+        D: Math.floor(rand() * 2),
+        G: Math.floor(rand() * 2),
+        UTIL: Math.floor(rand() * 2),
+      });
+      const fill = assignNight(players, slots);
+      expect(fill.started.size).toBe(bruteStarts(players, slots));
+      for (const [id, slot] of fill.started) {
+        const player = players.find((row) => row.id === id);
+        expect(player).toBeTruthy();
+        if (slot === "UTIL") continue;
+        expect(player?.positions).toContain(slot);
+      }
+      checked++;
+    }
+    expect(checked).toBe(40);
   });
 });

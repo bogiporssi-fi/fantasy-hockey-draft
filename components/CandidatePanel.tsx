@@ -1,7 +1,7 @@
 "use client";
 
 import { t } from "@/lib/i18n";
-import { formatDay, formatRange } from "@/lib/weeks";
+import { formatDay, formatRange, localIsoDate } from "@/lib/weeks";
 import { formatEligibility } from "@/lib/positions";
 import type {
   CandidateMetrics,
@@ -170,7 +170,7 @@ export function CandidatePanel({
   onAddToRoster: () => void;
 }) {
   const c = t(lang);
-  const upcoming = games.filter((g) => g.date >= new Date().toISOString().slice(0, 10));
+  const upcoming = games.filter((g) => g.date >= localIsoDate());
 
   return (
     <section className="flex h-full min-h-0 flex-col rounded-2xl border border-line bg-panel/80">

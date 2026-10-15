@@ -1,11 +1,40 @@
 import { DEFAULT_SLOTS, defaultState, STORAGE_KEY } from "./defaults";
-import type { AppState, LeagueProfile, SlotConfig } from "./types";
+import type { AppState, FantasyPosition, LeagueProfile, RosterPlayer, SlotConfig } from "./types";
+import { FANTASY_POSITIONS } from "./types";
 
 function mergeSlots(raw: Partial<SlotConfig> | undefined): SlotConfig {
   return { ...DEFAULT_SLOTS, ...(raw ?? {}) };
 }
 
-function revive(parsed: unknown): AppState {
+const FANTASY_MARKS = new Set<string>(FANTASY_POSITIONS);
+
+export function revivePositions(raw: unknown): FantasyPosition[] {
+  if (!Array.isArray(raw)) return ["C"];
+  const out: FantasyPosition[] = [];
+  for (const pos of raw) {
+    if (typeof pos !== "string" || !FANTASY_MARKS.has(pos) || out.includes(pos as FantasyPosition)) {
+      continue;
+    }
+    out.push(pos as FantasyPosition);
+  }
+  return out.length ? out : ["C"];
+}
+
+function reviveRoster(raw: unknown): RosterPlayer[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<number>();
+  const roster: RosterPlayer[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const id = (row as RosterPlayer).id;
+    if (typeof id !== "number" || seen.has(id)) continue;
+    seen.add(id);
+    roster.push({ id, positions: revivePositions((row as RosterPlayer).positions) });
+  }
+  return roster;
+}
+
+export function reviveState(parsed: unknown): AppState {
   const fallback = defaultState();
   if (!parsed || typeof parsed !== "object") return fallback;
   const o = parsed as Partial<AppState>;
@@ -19,14 +48,7 @@ function revive(parsed: unknown): AppState {
         name: row.name || "Kimppa",
         slots: mergeSlots(row.slots),
         weekStartsOn: row.weekStartsOn === 0 ? 0 : 1,
-        roster: Array.isArray(row.roster)
-          ? row.roster
-              .filter((r) => r && typeof r.id === "number")
-              .map((r) => ({
-                id: r.id,
-                positions: Array.isArray(r.positions) && r.positions.length ? r.positions : ["C"],
-              }))
-          : [],
+        roster: reviveRoster(row.roster),
       };
     });
   if (profiles.length === 0) return fallback;
@@ -45,7 +67,7 @@ export function loadState(): AppState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultState();
-    return revive(JSON.parse(raw));
+    return reviveState(JSON.parse(raw));
   } catch {
     return defaultState();
   }

@@ -12,6 +12,7 @@ import type {
   RosterPlayer,
 } from "@/lib/types";
 import { activeRosterLimit, totalRosterLimit } from "@/lib/defaults";
+import { localIsoDate } from "@/lib/weeks";
 import { PlayerRow } from "./PlayerBits";
 import { PlayerSearch } from "./PlayerSearch";
 
@@ -57,7 +58,7 @@ export function RosterPanel({
     const nhl = byId.get(r.id);
     if (!nhl) return [];
     const all = data.teamGames[nhl.team] ?? [];
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localIsoDate();
     return all.filter((g) => g.date >= today);
   }
 
