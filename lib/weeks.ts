@@ -17,6 +17,15 @@ export function addDays(iso: string, days: number): string {
   return isoDate(d);
 }
 
+/** Calendar date in the runtime timezone. Not UTC, so a US evening stays on that local night. */
+export function localIsoDate(now = new Date()): string {
+  return isoDate(now);
+}
+
+export function isOnOrAfterLocalToday(iso: string, now = new Date()): boolean {
+  return iso >= localIsoDate(now);
+}
+
 export function weekday(iso: string): number {
   return parseDate(iso).getDay();
 }

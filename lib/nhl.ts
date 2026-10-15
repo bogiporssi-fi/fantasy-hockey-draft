@@ -86,14 +86,28 @@ interface StandingsResponse {
   }[];
 }
 
+interface ScheduleGame {
+  gameType?: number;
+  gameDate?: string;
+  /** Ignored for the fantasy night. A late ET start is often the next UTC date. */
+  startTimeUTC?: string;
+  awayTeam?: { abbrev?: string };
+  homeTeam?: { abbrev?: string };
+}
+
 interface ScheduleResponse {
   currentSeason?: number;
-  games?: {
-    gameType?: number;
-    gameDate?: string;
-    awayTeam?: { abbrev?: string };
-    homeTeam?: { abbrev?: string };
-  }[];
+  games?: ScheduleGame[];
+}
+
+/**
+ * Fantasy night is the NHL `gameDate` calendar day.
+ * `startTimeUTC` is not converted, so a US evening game does not roll forward.
+ */
+export function fantasyGameDate(game: { gameDate?: string; startTimeUTC?: string | null }): string | null {
+  const date = game.gameDate?.trim().slice(0, 10) ?? "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  return date;
 }
 
 interface RosterPlayerRaw {
@@ -227,10 +241,12 @@ export async function loadNhlData(): Promise<NhlPayload> {
     if (row.schedule.currentSeason) season = row.schedule.currentSeason;
     const games: NhlGame[] = [];
     for (const g of row.schedule.games ?? []) {
-      if (g.gameType !== 2 || !g.gameDate) continue;
+      if (g.gameType !== 2) continue;
+      const date = fantasyGameDate(g);
+      if (!date) continue;
       const home = g.homeTeam?.abbrev === row.abbrev;
       const opponent = home ? (g.awayTeam?.abbrev ?? "") : (g.homeTeam?.abbrev ?? "");
-      games.push({ date: g.gameDate, opponent, home });
+      games.push({ date, opponent, home });
     }
     games.sort((a, b) => a.date.localeCompare(b.date));
     teamGames[row.abbrev] = games;

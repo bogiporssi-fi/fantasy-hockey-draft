@@ -19,3 +19,8 @@ export function toggleFantasyPosition(
 export function formatEligibility(positions: FantasyPosition[]): string {
   return orderedPositions(positions).join("/");
 }
+
+/** Paste import has no Yahoo multi-eligibility. The NHL roster position is the only mark. */
+export function nhlDefaultEligibility(position: FantasyPosition): FantasyPosition[] {
+  return [position];
+}

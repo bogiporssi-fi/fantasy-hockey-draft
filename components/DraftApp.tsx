@@ -13,7 +13,7 @@ import { t } from "@/lib/i18n";
 import type { LuckPayload, LuckReport } from "@/lib/luck";
 import { normalizeName } from "@/lib/names";
 import { evaluateCandidate } from "@/lib/overlap";
-import { toggleFantasyPosition } from "@/lib/positions";
+import { nhlDefaultEligibility, toggleFantasyPosition } from "@/lib/positions";
 import {
   getServerStateSnapshot,
   getStateSnapshot,
@@ -29,7 +29,7 @@ import type {
   NhlPlayer,
   RosterPlayer,
 } from "@/lib/types";
-import { buildWeeks } from "@/lib/weeks";
+import { buildWeeks, localIsoDate } from "@/lib/weeks";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 const MAX_COMPARE = 12;
@@ -437,7 +437,7 @@ export function DraftApp() {
                 games: (() => {
                   const nhl = playerById.get(e.id);
                   if (!nhl) return [];
-                  const today = new Date().toISOString().slice(0, 10);
+                  const today = localIsoDate();
                   return gamesOf(nhl).filter((g) => g.date >= today);
                 })(),
               }))}
@@ -526,7 +526,7 @@ export function DraftApp() {
             const take = matched.slice(0, room);
             patchProfile([
               ...profile.roster,
-              ...take.map((p) => ({ id: p.id, positions: [p.position] as FantasyPosition[] })),
+              ...take.map((p) => ({ id: p.id, positions: nhlDefaultEligibility(p.position) })),
             ]);
             setPasteOpen(false);
             setFlash(

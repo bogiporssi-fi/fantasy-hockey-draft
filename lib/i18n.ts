@@ -90,7 +90,7 @@ const fi = {
     "Maalivahdeilla otteluilta = joukkueen ottelu, ei varmistettu aloitus. Skataereilla sama: ohjelma, ei kokoonpanovarmistus.",
   howTitle: "Miten laskenta toimii",
   howBody:
-    "Jokainen otteluilta: nykyinen kokoonpano täyttää aktiivipaikat ahneesti (kapeampi merkitty Yahoo-kelpoisuus ensin). Pelaaja saa aktiivi-illan vain sille paikalle, jonka merkkasit (C / LW / RW / D / G) — LW-merkintä ei koskaan vie C-paikkaa. UTIL-paikkaan vain, jos kimpassa on UTIL. Ehdokas on hyödyllinen vain jos tällainen paikka on vielä auki. Penkki-ilta = ottelu, kun merkittyjä paikkoja ei jää. Ei Yahoo-kirjautumista, ei pistemääräennusteita.",
+    "Jokainen otteluilta sovitetaan maksimisovituksella: pelaaja vain merkittyyn paikkaan (C / LW / RW / D / G). UTIL vain, jos kimpassa on UTIL-paikkoja. BN ei ole aloituspaikka. Hyöty-ilta = ehdokas nostaa aloittajien määrää, joten monipaikkainen kokoonpanopelaaja voi siirtyä toiselle merkilleen. Penkki-ilta = ehdokas ei mahdu ilman että joku muu jäisi aloittamatta. Loukkaantuminen ei poista pelaajaa laskennasta: yö on joukkueen ottelu. Ei Yahoo-kirjautumista, ei pistemääräennusteita.",
   dataSource:
     "Otteluohjelma: NHL Web API. Pelaajat: aktiivirosteri plus loukkaantuneet (IR, DTD, sivussa), jotka puuttuvat sieltä. Ei keksittyjä otteluita.",
   savedLocal: "Kimpat ja kokoonpano tallentuvat tähän selaimeen.",
@@ -369,7 +369,7 @@ const en: typeof fi = {
     "For goalies, a game night is their team’s game — not a confirmed start. Skaters: schedule only, not lineup locks.",
   howTitle: "How scoring works",
   howBody:
-    "Each game night: the current roster fills active slots greedily (narrower marked Yahoo eligibility first). A player is started only in a slot they marked (C/LW/RW/D/G) — LW-only never takes C. UTIL only if the league still has UTIL. A candidate is useful only if such a slot is still open. Bench night = they play when marked slots are already full. No Yahoo login, no category projections.",
+    "Each game night is a maximum matching: a player starts only in a marked slot (C/LW/RW/D/G). UTIL only if the league has UTIL slots. BN is not a start slot. A useful night means the candidate increases the number of starters, so a multi-eligible roster player can move to another mark. A bench night means the candidate cannot start unless someone else sits. Injury does not remove a player: a night is the team’s game. No Yahoo login, no category projections.",
   dataSource:
     "Schedule: NHL Web API. Players: active roster plus injured players (IR, DTD, out) missing from it. No invented games.",
   savedLocal: "League profiles and roster are saved in this browser.",

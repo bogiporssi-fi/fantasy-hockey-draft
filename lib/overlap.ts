@@ -21,6 +21,8 @@ export interface NightFill {
   remaining: Record<StartSlot, number>;
 }
 
+const START_ORDER: StartSlot[] = ["C", "LW", "RW", "D", "G", "UTIL"];
+
 export function emptyRemaining(slots: SlotConfig): Record<StartSlot, number> {
   return {
     C: slots.C,
@@ -29,6 +31,23 @@ export function emptyRemaining(slots: SlotConfig): Record<StartSlot, number> {
     D: slots.D,
     G: slots.G,
     UTIL: slots.UTIL,
+  };
+}
+
+function slotCount(slots: SlotConfig, key: StartSlot): number {
+  const n = slots[key];
+  if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) return 0;
+  return Math.floor(n);
+}
+
+function normalizedCaps(slots: SlotConfig): Record<StartSlot, number> {
+  return {
+    C: slotCount(slots, "C"),
+    LW: slotCount(slots, "LW"),
+    RW: slotCount(slots, "RW"),
+    D: slotCount(slots, "D"),
+    G: slotCount(slots, "G"),
+    UTIL: slotCount(slots, "UTIL"),
   };
 }
 
@@ -46,9 +65,8 @@ export function yahooMarks(positions: FantasyPosition[]): FantasyPosition[] {
 }
 
 /**
- * Place a player only into an active slot they marked (C/LW/RW/D/G).
- * UTIL is not a Yahoo mark — it is used only when the league profile still
- * has remaining UTIL capacity.
+ * Single-player preference against leftover counts.
+ * Tightest open marked slot, then UTIL. Nightly assignment does not use this.
  */
 export function pickSlot(
   positions: FantasyPosition[],
@@ -69,32 +87,97 @@ export function pickSlot(
   return null;
 }
 
+/** UTIL is a league slot, not a Yahoo mark. Any player may use it, including goalies. */
+function canPlay(player: EligiblePlayer, slot: StartSlot): boolean {
+  if (slot === "UTIL") return true;
+  return yahooMarks(player.positions).includes(slot);
+}
+
+/** First row wins when the same id appears twice. */
+export function dedupePlayers(players: EligiblePlayer[]): EligiblePlayer[] {
+  const seen = new Set<string>();
+  const out: EligiblePlayer[] = [];
+  for (const player of players) {
+    if (seen.has(player.id)) continue;
+    seen.add(player.id);
+    out.push(player);
+  }
+  return out;
+}
+
+function byNarrowThenId(a: EligiblePlayer, b: EligiblePlayer): number {
+  const diff = yahooMarks(a.positions).length - yahooMarks(b.positions).length;
+  if (diff !== 0) return diff;
+  return a.id.localeCompare(b.id);
+}
+
+/** Cardinality only. Edge order does not matter. */
+function maximumMatchingSize(players: EligiblePlayer[], caps: Record<StartSlot, number>): number {
+  const copies: StartSlot[] = [];
+  for (const slot of START_ORDER) {
+    for (let i = 0; i < caps[slot]; i++) copies.push(slot);
+  }
+  const adj = players.map((player) => {
+    const edges: number[] = [];
+    for (let i = 0; i < copies.length; i++) {
+      if (canPlay(player, copies[i])) edges.push(i);
+    }
+    return edges;
+  });
+  const matchTo = new Array<number>(copies.length).fill(-1);
+  const dfs = (u: number, seen: boolean[]): boolean => {
+    for (const v of adj[u]) {
+      if (seen[v]) continue;
+      seen[v] = true;
+      const holder = matchTo[v];
+      if (holder === -1 || dfs(holder, seen)) {
+        matchTo[v] = u;
+        return true;
+      }
+    }
+    return false;
+  };
+  let count = 0;
+  for (let u = 0; u < players.length; u++) {
+    if (dfs(u, new Array(copies.length).fill(false))) count++;
+  }
+  return count;
+}
+
 /**
- * Greedy nightly assignment from each player's Yahoo marks only.
- * Narrower eligibility first, then the tightest remaining marked slot.
+ * Maximum bipartite matching of players to slot copies.
+ * Among maximum matchings, earlier players (narrower Yahoo marks, then id)
+ * keep the earliest slot in C → LW → RW → D → G → UTIL that still allows
+ * a maximum matching of everyone else.
+ * BN is a roster cap, not a nightly slot.
  */
 export function assignNight(players: EligiblePlayer[], slots: SlotConfig): NightFill {
-  const remaining = emptyRemaining(slots);
+  const caps = normalizedCaps(slots);
+  const ordered = dedupePlayers(players).sort(byNarrowThenId);
+  let need = maximumMatchingSize(ordered, caps);
   const started = new Map<string, StartSlot>();
   const benched: string[] = [];
 
-  const sorted = [...players].sort((a, b) => {
-    const diff = yahooMarks(a.positions).length - yahooMarks(b.positions).length;
-    if (diff !== 0) return diff;
-    return a.id.localeCompare(b.id);
-  });
-
-  for (const player of sorted) {
-    const slot = pickSlot(player.positions, remaining);
-    if (slot) {
-      remaining[slot] -= 1;
-      started.set(player.id, slot);
-    } else {
-      benched.push(player.id);
+  for (let i = 0; i < ordered.length; i++) {
+    const player = ordered[i];
+    const rest = ordered.slice(i + 1);
+    let placed: StartSlot | null = null;
+    for (const slot of START_ORDER) {
+      if (caps[slot] <= 0 || !canPlay(player, slot)) continue;
+      caps[slot] -= 1;
+      const restMax = maximumMatchingSize(rest, caps);
+      if (restMax === need - 1) {
+        placed = slot;
+        need = restMax;
+        break;
+      }
+      caps[slot] += 1;
     }
+    if (placed) started.set(player.id, placed);
+    else benched.push(player.id);
   }
 
-  return { started, benched, remaining };
+  return { started, benched, remaining: caps };
 }
 
 export function openEligibleSlots(
@@ -116,21 +199,44 @@ export interface EvaluateInput {
   weeks: WeekWindow[];
 }
 
+function playingOn(
+  roster: EligiblePlayer[],
+  rosterGames: Map<string, Set<string>>,
+  date: string,
+  ignoreId: string,
+): EligiblePlayer[] {
+  return dedupePlayers(
+    roster.filter((player) => player.id !== ignoreId && rosterGames.get(player.id)?.has(date)),
+  );
+}
+
+/** True when the candidate raises the number of starters that night. */
+function addsStart(roster: EligiblePlayer[], candidate: EligiblePlayer, slots: SlotConfig): boolean {
+  const caps = normalizedCaps(slots);
+  const without = maximumMatchingSize(roster, caps);
+  const withCandidate = maximumMatchingSize([...roster, candidate], caps);
+  return withCandidate > without;
+}
+
 export function evaluateCandidate(input: EvaluateInput): CandidateMetrics {
   const { slots, roster, rosterGames, candidate, candidateGames, weeks } = input;
   const nights: NightOutcome[] = [];
+  const seenDates = new Set<string>();
 
   for (const game of candidateGames) {
-    const playing = roster.filter((p) => rosterGames.get(p.id)?.has(game.date));
-    const fill = assignNight(playing, slots);
-    const slot = pickSlot(candidate.positions, fill.remaining);
-    const open = openEligibleSlots(fill.remaining, candidate.positions);
+    if (seenDates.has(game.date)) continue;
+    seenDates.add(game.date);
+    const playing = playingOn(roster, rosterGames, game.date, candidate.id);
+    const useful = addsStart(playing, candidate, slots);
+    const slot = useful
+      ? (assignNight([...playing, candidate], slots).started.get(candidate.id) ?? null)
+      : null;
     nights.push({
       date: game.date,
-      result: slot ? "useful" : "bench",
+      result: useful ? "useful" : "bench",
       slot,
       rosterPlaying: playing.length,
-      openEligibleSlots: open,
+      openEligibleSlots: useful ? 1 : 0,
       opponent: game.opponent,
       home: game.home,
     });
@@ -151,12 +257,9 @@ export function evaluateCandidate(input: EvaluateInput): CandidateMetrics {
     let rosterPlayerGames = 0;
     let emptyEligibleNights = 0;
     for (let d = week.start; d <= week.end; d = addDays(d, 1)) {
-      const playing = roster.filter((p) => rosterGames.get(p.id)?.has(d));
+      const playing = playingOn(roster, rosterGames, d, candidate.id);
       rosterPlayerGames += playing.length;
-      const fill = assignNight(playing, slots);
-      if (openEligibleSlots(fill.remaining, candidate.positions) > 0) {
-        emptyEligibleNights += 1;
-      }
+      if (addsStart(playing, candidate, slots)) emptyEligibleNights += 1;
     }
     return {
       week,
